@@ -1,0 +1,44 @@
+# version: '3.2'
+
+# services:
+#   # Это ваш сервис MinIO, он остается почти без изменений
+#   app:
+#     image: minio/minio
+#     container_name: minio-server
+#     env_file: ./minio.env-sample
+#     volumes:
+#      - ./minio-data:/data
+#     ports:
+#      - "9001:9001"
+#      - "9000:9000"
+#     networks:
+#       - traefik_public
+#     command:  minio server /data --console-address ":9001"
+#     # Метки traefik здесь больше не нужны, если вы ходите через localhost,
+#     # но можно и оставить, они не мешают.
+
+# networks:
+#   traefik_public:
+#     external: true
+
+
+version: '3.2'
+
+services:
+  app:
+    image: minio/minio
+    container_name: minio-server
+    env_file: ./minio.env-sample
+    volumes:
+     - ./minio-data:/data
+    ports:
+     - "9001:9001"
+     - "9000:9000"
+    networks:
+      - airflow_net  # <-- Подключаемся к сети (используем алиас снизу)
+    command:  minio server /data --console-address ":9001"
+
+networks:
+  airflow_net:       # <-- Внутреннее имя сети в этом файле
+    external: true
+    name: big_data_1st_praktise_default # <-- Реальное имя сети, где живут Postgres и Airflow
