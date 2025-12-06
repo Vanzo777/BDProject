@@ -1,0 +1,29 @@
+# файлы и папки сгенерированные Airflow
+logs/*
+pgdata/*
+plugins/*
+config/*
+
+# Каталоги для кеша Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Файлы системы macOS
+.DS_Store
+
+# Файлы IDE и редакторов
+.idea/
+.vscode/
+*.iml
+*.idea/
+
+# Файлы для виртуального окружения Python
+venv/
+.venv/
+*.venv/
+/config/
+/logs/
+/plugins/
+/pgdata/
