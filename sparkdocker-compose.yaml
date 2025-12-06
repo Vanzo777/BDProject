@@ -1,4 +1,5 @@
 version: '3'
+
 services:
   master:
     image: apache/spark:3.5.1
@@ -20,7 +21,7 @@ services:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
     networks:
-      - spark-network
+      - big_data_net
 
   worker:
     image: apache/spark:3.5.1
@@ -44,8 +45,8 @@ services:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
     networks:
-      - spark-network
+      - big_data_net
 
 networks:
-  spark-network:
-    driver: bridge
+  big_data_net:
+    external: true
