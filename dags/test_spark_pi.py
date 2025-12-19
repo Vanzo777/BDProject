@@ -52,5 +52,8 @@ if __name__ == "__main__":
     n = 500_000
     pi_est = estimate_pi(n)
 
+    print("denisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenis")
+
     end = datetime.now()
     log.info("Завершено. Итоговая оценка Pi = %.6f, длительность = %s", pi_est, end - start)
+    log.info("denisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenisdenis")

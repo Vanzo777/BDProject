@@ -2,7 +2,10 @@ version: '3'
 
 services:
   master:
-    image: apache/spark:3.5.1
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    image: custom-spark:4.0.1-py312  # Даем имя образу
     container_name: spark-master
     ports:
       - "5080:8080"
@@ -17,6 +20,8 @@ services:
       SPARK_MASTER_HOST: spark-master
       SPARK_MASTER_PORT: 7077
       SPARK_MASTER_WEBUI_PORT: 8080
+      PYSPARK_PYTHON: python3.12
+      PYSPARK_DRIVER_PYTHON: python3.12
     volumes:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
@@ -24,23 +29,28 @@ services:
       - big_data_net
 
   worker:
-    image: apache/spark:3.5.1
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    image: custom-spark:4.0.1-py312  # Используем тот же образ
     container_name: spark-worker
     depends_on:
       - master
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
-      spark://master:7077
-      --cores 1
+      spark://spark-master:7077
+      --cores 2
       --memory 2G
       --webui-port 8081
     ports:
       - "8081:8081"
     environment:
-      SPARK_WORKER_CORES: 1
+      SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 2G
       SPARK_WORKER_PORT: 8881
       SPARK_WORKER_WEBUI_PORT: 8081
+      PYSPARK_PYTHON: python3.12
+      PYSPARK_DRIVER_PYTHON: python3.12
     volumes:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
