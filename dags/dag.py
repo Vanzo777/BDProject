@@ -9,27 +9,32 @@ default_args = {
 }
 
 with DAG(
-    dag_id="test_spark_bash_cluster",
+    dag_id="iceberg_example",
     default_args=default_args,
     schedule=None,
     catchup=False,
-    tags=["test", "spark"],
+    tags=["iceberg", "minio"],
 ) as dag:
 
-    run_spark_cluster = BashOperator(
-        task_id="run_spark_cluster",
+    create_iceberg_table = BashOperator(
+        task_id="create_iceberg_table",
         bash_command="""
         spark-submit \
           --master spark://spark-master:7077 \
           --deploy-mode client \
-          --driver-memory 512m \
-          --executor-memory 512m \
-          --executor-cores 1 \
-          --total-executor-cores 2 \
           --conf spark.driver.host=bdproject-airflow-worker-1 \
           --conf spark.driver.bindAddress=0.0.0.0 \
-          /opt/airflow/dags/test_spark_pi.py
+          --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+          --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
+          --conf spark.sql.catalog.iceberg.type=hadoop \
+          --conf spark.sql.catalog.iceberg.warehouse=s3a://warehouse/ \
+          --conf spark.hadoop.fs.s3a.endpoint=http://minio-server:9000 \
+          --conf spark.hadoop.fs.s3a.access.key=minioadmin \
+          --conf spark.hadoop.fs.s3a.secret.key=minioadmin \
+          --conf spark.hadoop.fs.s3a.path.style.access=true \
+          --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+          /opt/airflow/dags/scripts/create_iceberg_table.py
         """
     )
 
-    run_spark_cluster
+    create_iceberg_table

@@ -2,13 +2,13 @@ FROM apache/spark:4.0.1
 
 USER root
 
-# Обновите систему и установите необходимые пакеты
+# Обновите систему
 RUN apt-get update && \
     apt-get install -y software-properties-common curl gnupg2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Установите Python 3.12 из deadsnakes PPA
+# Установите Python 3.12
 RUN add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
     apt-get install -y \
@@ -22,20 +22,27 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
 # Установите pip для Python 3.12
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 
-# Установите необходимые Python пакеты
+# Установите Python пакеты включая Iceberg
 RUN python3.12 -m pip install --no-cache-dir \
     pyspark==4.0.1 \
-    py4j
+    py4j \
+    pyiceberg[s3fs,pyarrow]==0.7.1
 
-# Сделайте Python 3.12 версией по умолчанию
+# Скачайте Iceberg JAR файлы для Spark
+RUN curl -L https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.5.2/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+    -o /opt/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar
+
+RUN curl -L https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.5.2/iceberg-aws-bundle-1.5.2.jar \
+    -o /opt/spark/jars/iceberg-aws-bundle-1.5.2.jar
+
+# Сделайте Python 3.12 по умолчанию
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 2 && \
     update-alternatives --set python3 /usr/bin/python3.12
 
-# Создайте символическую ссылку для python
 RUN ln -sf /usr/bin/python3.12 /usr/bin/python
 
-# Проверьте установку
+# Проверка
 RUN python3 --version && \
     python3.12 --version && \
     python3 -m pip --version
