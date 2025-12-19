@@ -17,6 +17,7 @@ x-airflow-common: &airflow-common
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/apps:/opt/airflow/apps
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
@@ -111,6 +112,16 @@ services:
   airflow-worker:
     <<: *airflow-common
     command: celery worker
+    # Явно задаем имя хоста для корректной работы spark-driver внутри контейнера
+    hostname: airflow-worker
+    # Открываем порты для Spark Driver (обратное соединение от Executor) и логов
+    expose:
+      - 8793
+      - 20000-20010
+    ports:
+      - "8793:8793"
+      # Пробрасываем порты драйвера (необязательно, если вся сеть внутри Docker, но полезно для дебага)
+      - "20000-20010:20000-20010"
     healthcheck:
       test:
         - "CMD-SHELL"
@@ -122,6 +133,8 @@ services:
     environment:
       <<: *airflow-common-env
       DUMB_INIT_SETSID: "0"
+      # Важно для Spark: чтобы драйвер слушал 0.0.0.0, а не localhost
+      SPARK_LOCAL_IP: "0.0.0.0"
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
@@ -151,13 +164,23 @@ services:
     command:
       - -c
       - |
-        # оригинальный скрипт инициализации Airflow
+        echo "Running Airflow DB migrations..."
         /entrypoint airflow db upgrade
+
+        echo "Creating Admin user..."
         /entrypoint airflow users create \
           --username "${_AIRFLOW_WWW_USER_USERNAME:-airflow}" \
           --password "${_AIRFLOW_WWW_USER_PASSWORD:-airflow}" \
           --firstname Admin --lastname User \
           --role Admin --email admin@example.com
+
+        echo "Creating Spark connection spark_default..."
+        /entrypoint airflow connections add spark_default \
+          --conn-type=Spark \
+          --conn-host=spark-master \
+          --conn-port=7077
+
+        echo "Airflow init completed."
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
