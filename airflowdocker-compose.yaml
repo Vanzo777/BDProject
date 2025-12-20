@@ -11,7 +11,6 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
-    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ''
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
@@ -63,13 +62,13 @@ services:
     networks:
       - bdproject_default
 
-  airflow-apiserver:
+  airflow-webserver:
     <<: *airflow-common
-    command: api-server
+    command: webserver
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -95,33 +94,15 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  airflow-dag-processor:
-    <<: *airflow-common
-    command: dag-processor
-    healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-
   airflow-worker:
     <<: *airflow-common
     command: celery worker
-    # Явно задаем имя хоста для корректной работы spark-driver внутри контейнера
     hostname: airflow-worker
-    # Открываем порты для Spark Driver (обратное соединение от Executor) и логов
     expose:
       - 8793
       - 20000-20010
     ports:
       - "8793:8793"
-      # Пробрасываем порты драйвера (необязательно, если вся сеть внутри Docker, но полезно для дебага)
       - "20000-20010:20000-20010"
     healthcheck:
       test:
@@ -134,13 +115,10 @@ services:
     environment:
       <<: *airflow-common-env
       DUMB_INIT_SETSID: "0"
-      # Важно для Spark: чтобы драйвер слушал 0.0.0.0, а не localhost
       SPARK_LOCAL_IP: "0.0.0.0"
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
-      airflow-apiserver:
-        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
 
@@ -179,7 +157,7 @@ services:
         /entrypoint airflow connections add spark_default \
           --conn-type=Spark \
           --conn-host=spark-master \
-          --conn-port=7077
+          --conn-port=7077 || echo "Connection already exists"
 
         echo "Airflow init completed."
     environment:
