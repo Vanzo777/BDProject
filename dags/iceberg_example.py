@@ -20,10 +20,9 @@ with DAG(
     create_iceberg_table = BashOperator(
         task_id="create_iceberg_table",
         bash_command=r"""
-set -e
-
 spark-submit \
   --packages org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0 \
+  --conf spark.jars.ivy=/tmp/.ivy2 \
   --master spark://spark-master:7077 \
   --deploy-mode client \
   --conf spark.driver.host=bdproject-airflow-worker-1 \
@@ -38,11 +37,8 @@ spark-submit \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.path.style.access=true \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.connection.ssl.enabled=false \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
-  --conf spark.pyspark.python=python3 \
-  --conf spark.pyspark.driver.python=python3 \
-  --conf spark.executorEnv.PYSPARK_PYTHON=python3 \
   /opt/airflow/dags/scripts/create_iceberg_table.py
 """,
-    )
+)
 
     create_iceberg_table
