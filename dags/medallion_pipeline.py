@@ -1,6 +1,7 @@
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+from dags.scripts.load_gold_to_postgres import create_postgres_load_tasks
 
 default_args = {
     'owner': 'airflow',
@@ -11,10 +12,10 @@ default_args = {
 with DAG(
     'medallion_pipeline',
     default_args=default_args,
-    description='Bronze → Silver → Gold pipeline for products and orders',
+    description='Bronze → Silver → Gold → PostgreSQL pipeline for products and orders',
     schedule=None,  # Изменено с schedule_interval на schedule
     catchup=False,
-    tags=['iceberg', 'medallion', 'etl'],
+    tags=['iceberg', 'medallion', 'etl', 'postgres'],
 ) as dag:
 
     # Task 1: Загрузка CSV в Bronze слой (Iceberg таблицы)
@@ -98,5 +99,8 @@ spark-submit \
         """,
     )
 
-    # Определяем зависимости: Bronze → Silver → Gold
-    bronze_load >> silver_transform >> gold_datamart
+    # Task 4: Загрузка данных из Gold в PostgreSQL через Trino
+    postgres_load = create_postgres_load_tasks(dag)
+
+    # Определяем зависимости: Bronze → Silver → Gold → PostgreSQL
+    bronze_load >> silver_transform >> gold_datamart >> postgres_load
