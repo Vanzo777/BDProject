@@ -11,4 +11,8 @@ RUN apt-get update && \
 USER airflow
 RUN pip install --no-cache-dir \
     apache-airflow-providers-apache-spark \
-    pyspark
+    pyspark \
+    trino==0.328.0
+
+
+

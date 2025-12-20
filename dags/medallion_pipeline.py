@@ -1,6 +1,7 @@
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+from dags.scripts.load_gold_to_postgres import create_postgres_load_tasks
 
 default_args = {
     'owner': 'airflow',
@@ -99,4 +100,5 @@ spark-submit \
     )
 
     # Определяем зависимости: Bronze → Silver → Gold
-    bronze_load >> silver_transform >> gold_datamart
+    bronze_load >> silver_transform >> gold_datamart >> create_postgres_load_tasks(dag)
+
