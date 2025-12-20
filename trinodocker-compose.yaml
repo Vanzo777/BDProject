@@ -1,17 +1,19 @@
 version: '3.8'
 
+
 services:
   trino-coordinator:
     image: trinodb/trino:latest
     container_name: trino-coordinator
     ports:
-      - "8080:8080"
+      - "8090:8080"
     environment:
       - CATALOG_MANAGEMENT=dynamic
     volumes:
       - ./trino/etc:/etc/trino
     networks:
       - bdproject_default
+
 
 networks:
   bdproject_default:

@@ -12,4 +12,5 @@ docker compose -f hive-metastore/hivedocker-compose.yaml up -d
 docker compose -f sparkdocker-compose.yaml up -d
 docker compose -f minio.yml up -d
 docker compose -f airflowdocker-compose.yaml up -d
-docker compose -f docker-compose.trino.yaml up -d
+docker compose -f trinodocker-compose.yaml up -d
+
