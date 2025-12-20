@@ -31,3 +31,7 @@ venv/
 minio-data/
 # или, если хочешь строго из корня
 /minio-data/
+
+/data/
+data/orders.csv
+data/products.csv
