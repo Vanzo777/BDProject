@@ -26,7 +26,7 @@ services:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
     networks:
-      - big_data_net
+      - bdproject_default
 
   worker:
     build:
@@ -55,8 +55,8 @@ services:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
     networks:
-      - big_data_net
+      - bdproject_default
 
 networks:
-  big_data_net:
+  bdproject_default:
     external: true

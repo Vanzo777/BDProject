@@ -28,7 +28,7 @@ x-airflow-common: &airflow-common
     postgres:
       condition: service_healthy
   networks:
-    - big_data_net
+    - bdproject_default
 
 services:
   postgres:
@@ -46,7 +46,7 @@ services:
       start_period: 5s
     restart: always
     networks:
-      - big_data_net
+      - bdproject_default
 
   redis:
     image: redis:7.2-bookworm
@@ -60,7 +60,7 @@ services:
       start_period: 30s
     restart: always
     networks:
-      - big_data_net
+      - bdproject_default
 
   airflow-apiserver:
     <<: *airflow-common
@@ -190,11 +190,11 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
     networks:
-      - big_data_net
+      - bdproject_default
 
 volumes:
   postgres-db-volume:
 
 networks:
-  big_data_net:
+  bdproject_default:
     external: true

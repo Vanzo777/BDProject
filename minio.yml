@@ -12,8 +12,8 @@ services:
       - "9000:9000"
     command: minio server /data --console-address ":9001"
     networks:
-      - big_data_net
+      - bdproject_default
 
 networks:
-  big_data_net:
+  bdproject_default:
     external: true
