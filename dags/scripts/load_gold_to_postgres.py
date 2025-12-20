@@ -36,7 +36,8 @@ def create_postgres_load_tasks(dag):
         task = BashOperator(
             task_id=table_config['task_id'],
             bash_command=f"""
-                docker exec trino trino --execute "
+                docker exec trino-coordinator trino --execute "
+
                     -- Create schema if not exists
                     CREATE SCHEMA IF NOT EXISTS {catalog}.{schema};
                     
