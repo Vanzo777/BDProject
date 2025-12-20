@@ -1,7 +1,7 @@
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from dags.scripts.load_gold_to_postgres import create_postgres_load_tasks
+from scripts.load_gold_to_postgres import create_postgres_load_tasks
 
 default_args = {
     'owner': 'airflow',
@@ -13,7 +13,7 @@ with DAG(
     'medallion_pipeline',
     default_args=default_args,
     description='Bronze → Silver → Gold → PostgreSQL pipeline for products and orders',
-    schedule=None,  # Изменено с schedule_interval на schedule
+    schedule=None,
     catchup=False,
     tags=['iceberg', 'medallion', 'etl', 'postgres'],
 ) as dag:
@@ -27,8 +27,10 @@ spark-submit \
   --conf spark.jars.ivy=/tmp/.ivy2 \
   --master spark://spark-master:7077 \
   --deploy-mode client \
-  --conf spark.driver.host=bdproject-airflow-worker-1 \
+  --conf spark.driver.host=airflow-worker \
   --conf spark.driver.bindAddress=0.0.0.0 \
+  --conf spark.driver.port=20000 \
+  --conf spark.blockManager.port=20001 \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
   --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
   --conf spark.sql.catalog.iceberg.type=hive \
@@ -54,8 +56,10 @@ spark-submit \
   --conf spark.jars.ivy=/tmp/.ivy2 \
   --master spark://spark-master:7077 \
   --deploy-mode client \
-  --conf spark.driver.host=bdproject-airflow-worker-1 \
+  --conf spark.driver.host=airflow-worker \
   --conf spark.driver.bindAddress=0.0.0.0 \
+  --conf spark.driver.port=20002 \
+  --conf spark.blockManager.port=20003 \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
   --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
   --conf spark.sql.catalog.iceberg.type=hive \
@@ -81,8 +85,10 @@ spark-submit \
   --conf spark.jars.ivy=/tmp/.ivy2 \
   --master spark://spark-master:7077 \
   --deploy-mode client \
-  --conf spark.driver.host=bdproject-airflow-worker-1 \
+  --conf spark.driver.host=airflow-worker \
   --conf spark.driver.bindAddress=0.0.0.0 \
+  --conf spark.driver.port=20004 \
+  --conf spark.blockManager.port=20005 \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
   --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
   --conf spark.sql.catalog.iceberg.type=hive \
