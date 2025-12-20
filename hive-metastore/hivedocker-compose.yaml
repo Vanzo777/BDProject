@@ -1,7 +1,7 @@
 services:
   hive-metastore:
     build:
-      context: ./hive-metastore
+      context: .
       dockerfile: Dockerfile.hive
     container_name: hive-metastore
     ports:
@@ -9,7 +9,7 @@ services:
     depends_on:
       - metastore-db
     networks:
-      - bdproject_default   # или твоя сеть, важно чтобы была общая с spark/minio/airflow
+      - bdproject_default
 
   metastore-db:
     image: postgres:15
