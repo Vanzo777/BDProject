@@ -27,3 +27,7 @@ venv/
 /logs/
 /plugins/
 /pgdata/
+
+minio-data/
+# или, если хочешь строго из корня
+/minio-data/
