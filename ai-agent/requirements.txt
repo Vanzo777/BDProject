@@ -1,0 +1,47 @@
+# ============================================================================
+# SQL AI Agent - Dependencies
+# Python 3.12+
+# ============================================================================
+
+# Core LangChain (новые версии с поддержкой Pydantic v2)
+langchain==0.2.16
+langchain-community==0.2.16
+langchain-openai==0.1.23
+langchain-core==0.2.38
+
+# Database
+sqlalchemy==2.0.29
+psycopg2-binary==2.9.9
+
+# OpenAI API (for OpenRouter compatibility)
+openai==1.40.0
+
+# Configuration Management (Pydantic v2)
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+
+# YAML Support
+pyyaml==6.0.1
+
+# CLI and UI
+streamlit==1.33.0
+watchdog==4.0.0
+
+# Data Processing
+pandas==2.2.2
+numpy==1.26.4
+
+# Additional utilities
+requests==2.31.0
+httpx==0.27.0
+tenacity==8.2.3
+
+# Testing (optional)
+pytest==8.1.1
+pytest-asyncio==0.23.6
+
+# Code Quality (optional)
+black==24.4.0
+flake8==7.0.0
+isort==5.13.2
