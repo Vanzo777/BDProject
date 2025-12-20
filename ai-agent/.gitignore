@@ -1,0 +1,435 @@
+# ============================================================================
+# SQL AI Agent - .gitignore
+# ============================================================================
+
+# ============================================================================
+# Python
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+
+# NetBeans
+nbproject/
+
+# ============================================================================
+# Operating Systems
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================================================
+# Project Specific
+# ============================================================================
+
+# Конфигурация (содержит секреты!)
+.env
+*.env
+!.env.example
+
+# Логи
+*.log
+logs/
+*.log.*
+
+# Базы данных (локальные)
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker volumes
+postgres_data/
+minio_data/
+
+# Результаты тестов
+*_test_results.json
+test_results/
+test_output/
+
+# Временные файлы
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# Кэши
+.cache/
+*.cache
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd
+
+# ============================================================================
+# Data Files
+# ============================================================================
+
+# Датасеты (могут быть большими)
+data/raw/*
+data/processed/*
+data/external/*
+!data/.gitkeep
+
+# CSV файлы (если не нужны в репозитории)
+# *.csv
+
+# Parquet файлы
+# *.parquet
+
+# Архивы
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# ============================================================================
+# Notebooks and Documentation
+# ============================================================================
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Generated documentation
+docs/_build/
+docs/generated/
+
+# ============================================================================
+# Cloud and Deployment
+# ============================================================================
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Ansible
+*.retry
+
+# AWS
+.aws/
+
+# Google Cloud
+.gcloud/
+*-key.json
+
+# Azure
+.azure/
+
+# ============================================================================
+# Package Managers
+# ============================================================================
+
+# npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+
+# GitHub Actions
+.github/workflows/secrets/
+
+# GitLab CI
+.gitlab-ci-local/
+
+# ============================================================================
+# Security
+# ============================================================================
+
+# API Keys and secrets
+*secret*
+*SECRET*
+*credentials*
+*CREDENTIALS*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Exclude secrets from config
+config/secrets/
+secrets/
+.secrets/
+
+# ============================================================================
+# Streamlit
+# ============================================================================
+
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# ============================================================================
+# LangChain / LLM
+# ============================================================================
+
+# LangChain cache
+.langchain/
+langchain.db
+
+# LangSmith
+.langsmith/
+
+# Vector stores
+*.faiss
+*.index
+vector_stores/
+
+# ============================================================================
+# Docker
+# ============================================================================
+
+# Docker compose overrides
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+
+# ============================================================================
+# Monitoring and Profiling
+# ============================================================================
+
+# Profiling
+*.prof
+*.lprof
+
+# Monitoring
+prometheus_data/
+grafana_data/
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+
+# MacOS resource forks
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._*
+
+# Thumbnails
+Thumbs.db
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+
+# System files
+*.swp
+*.swo
+.~lock.*
+
+# ============================================================================
+# Custom Excludes (if needed)
+# ============================================================================
+
+# Примеры файлов для команды (можно раскомментировать)
+# team_config.yaml
+# prod_semantic_layer.yaml
+
+# Локальные эксперименты
+experiments/
+scratch/
+playground/
+
+# Большие модели (если локально скачиваете)
+models/
+*.bin
+*.safetensors
