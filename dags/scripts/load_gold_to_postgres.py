@@ -1,67 +1,63 @@
-from trino.dbapi import connect
-from trino.auth import BasicAuthentication
-import logging
+"""Load data from Iceberg Gold layer to PostgreSQL via Trino."""
+from airflow.operators.bash import BashOperator
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-def load_table_to_postgres(source_schema: str, source_table: str, 
-                          target_schema: str, target_table: str):
+def create_postgres_load_tasks(dag):
     """
-    Загружает данные из Iceberg (gold) в PostgreSQL через Trino
+    Create tasks to load Gold layer tables into PostgreSQL via Trino.
+    
+    Returns a list of BashOperator tasks that execute Trino SQL commands
+    to copy data from iceberg.gold.* tables to analytics_postgres.analytics.* tables.
     """
-    conn = connect(
-        host='trino',
-        port=8080,
-        user='trino',
-        catalog='iceberg',
-        schema=source_schema
-    )
     
-    cursor = conn.cursor()
+    # Table mapping: gold table -> postgres table
+    tables_to_load = [
+        {
+            'source': 'iceberg.gold.product_trading_metrics',
+            'target': 'analytics_postgres.analytics.product_trading_metrics',
+            'task_id': 'load_product_trading_metrics'
+        },
+        {
+            'source': 'iceberg.gold.daily_trading_summary',
+            'target': 'analytics_postgres.analytics.daily_trading_summary',
+            'task_id': 'load_daily_trading_summary'
+        }
+    ]
     
-    try:
-        # 1. Создаем схему в PostgreSQL если не существует
-        logger.info(f"Создание схемы {target_schema} в PostgreSQL")
-        cursor.execute(f"""
-            CREATE SCHEMA IF NOT EXISTS analytics_postgres.{target_schema}
-        """)
+    load_tasks = []
+    
+    for table_config in tables_to_load:
+        # Extract schema and table name from target
+        target_parts = table_config['target'].split('.')
+        catalog = target_parts[0]
+        schema = target_parts[1]
+        table = target_parts[2]
         
-        # 2. Удаляем старую таблицу если существует (для полной перезагрузки)
-        logger.info(f"Удаление старой таблицы {target_schema}.{target_table}")
-        cursor.execute(f"""
-            DROP TABLE IF EXISTS analytics_postgres.{target_schema}.{target_table}
-        """)
-        
-        # 3. Создаем таблицу и загружаем данные за один запрос (CREATE TABLE AS SELECT)
-        logger.info(f"Загрузка данных из iceberg.{source_schema}.{source_table} в PostgreSQL")
-        cursor.execute(f"""
-            CREATE TABLE analytics_postgres.{target_schema}.{target_table}
-            AS SELECT * FROM iceberg.{source_schema}.{source_table}
-        """)
-        
-        # 4. Получаем количество загруженных строк
-        cursor.execute(f"""
-            SELECT COUNT(*) FROM analytics_postgres.{target_schema}.{target_table}
-        """)
-        row_count = cursor.fetchone()[0]
-        
-        logger.info(f"Успешно загружено {row_count} строк в {target_schema}.{target_table}")
-        
-        return row_count
-        
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке таблицы: {str(e)}")
-        raise
-    finally:
-        cursor.close()
-        conn.close()
-
-if __name__ == "__main__":
-    # Пример использования
-    load_table_to_postgres(
-        source_schema='gold_dm',
-        source_table='your_table_name',
-        target_schema='analytics',
-        target_table='your_table_name'
-    )
+        task = BashOperator(
+            task_id=table_config['task_id'],
+            bash_command=f"""
+                docker exec trino trino --execute "
+                    -- Create schema if not exists
+                    CREATE SCHEMA IF NOT EXISTS {catalog}.{schema};
+                    
+                    -- Drop existing table
+                    DROP TABLE IF EXISTS {table_config['target']};
+                    
+                    -- Create table and load data from Gold layer
+                    CREATE TABLE {table_config['target']}
+                    AS SELECT * FROM {table_config['source']};
+                    
+                    -- Show row count
+                    SELECT COUNT(*) as row_count FROM {table_config['target']};
+                "
+            """,
+            dag=dag,
+        )
+        load_tasks.append(task)
+    
+    # Chain tasks if multiple tables (execute sequentially)
+    if len(load_tasks) > 1:
+        for i in range(len(load_tasks) - 1):
+            load_tasks[i] >> load_tasks[i + 1]
+    
+    return load_tasks[0] if load_tasks else None
