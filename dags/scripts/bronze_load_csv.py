@@ -66,8 +66,9 @@ df_products_from_s3 = spark.read.parquet(f"{BRONZE_PATH}products/")
 # Создаем таблицу динамически на основе схемы DataFrame
 df_products_from_s3.writeTo("iceberg.bronze.products") \
     .using("iceberg") \
-    .partitionBy("product_family") \
+    .partitionedBy("product_family") \
     .createOrReplace()
+
 
 print(f"✓ Created iceberg.bronze.products with {df_products_from_s3.count()} records")
 
@@ -76,7 +77,7 @@ df_orders_from_s3 = spark.read.parquet(f"{BRONZE_PATH}orders/")
 
 df_orders_from_s3.writeTo("iceberg.bronze.orders") \
     .using("iceberg") \
-    .partitionBy("load_date") \
+    .partitionedBy("load_date") \
     .createOrReplace()
 
 print(f"✓ Created iceberg.bronze.orders with {df_orders_from_s3.count()} records")

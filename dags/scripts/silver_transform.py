@@ -2,18 +2,24 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
+
 spark = SparkSession.builder \
     .appName("Silver Layer - Data Normalization") \
     .getOrCreate()
 
+
 print("=== SILVER LAYER: Normalizing and cleaning data ===")
 
+
 spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.silver")
+
 
 # ========== PRODUCTS SILVER ==========
 print("Transforming bronze.products → silver.products...")
 
+
 df_products_bronze = spark.table("iceberg.bronze.products")
+
 
 df_products_silver = df_products_bronze \
     .withColumn("expiration_date", 
@@ -58,6 +64,7 @@ df_products_silver = df_products_bronze \
         current_timestamp().alias("processed_timestamp")
     )
 
+
 spark.sql("""
     CREATE TABLE IF NOT EXISTS iceberg.silver.products (
         order_book_id BIGINT,
@@ -86,14 +93,22 @@ spark.sql("""
     PARTITIONED BY (product_family)
 """)
 
-df_products_silver.writeTo("iceberg.silver.products").overwrite()
+
+# ИСПРАВЛЕНО: используем overwritePartitions() вместо overwrite()
+df_products_silver.writeTo("iceberg.silver.products") \
+    .using("iceberg") \
+    .overwritePartitions()
+
 
 print(f"✓ Transformed {df_products_silver.count()} products to silver.products")
+
 
 # ========== ORDERS SILVER ==========
 print("Transforming bronze.orders → silver.orders...")
 
+
 df_orders_bronze = spark.table("iceberg.bronze.orders")
+
 
 df_orders_silver = df_orders_bronze \
     .withColumn("created_timestamp", 
@@ -142,6 +157,7 @@ df_orders_silver = df_orders_bronze \
         current_timestamp().alias("processed_timestamp")
     )
 
+
 spark.sql("""
     CREATE TABLE IF NOT EXISTS iceberg.silver.orders (
         order_id BIGINT,
@@ -172,9 +188,15 @@ spark.sql("""
     PARTITIONED BY (days(order_timestamp))
 """)
 
-df_orders_silver.writeTo("iceberg.silver.orders").overwrite()
+
+# ИСПРАВЛЕНО: используем overwritePartitions() вместо overwrite()
+df_orders_silver.writeTo("iceberg.silver.orders") \
+    .using("iceberg") \
+    .overwritePartitions()
+
 
 print(f"✓ Transformed {df_orders_silver.count()} orders to silver.orders")
+
 
 spark.stop()
 print("=== SILVER LAYER COMPLETE ===")
