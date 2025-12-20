@@ -1,27 +1,31 @@
 services:
+  hive-metastore:
+    build:
+      context: ./hive-metastore
+      dockerfile: Dockerfile.hive
+    container_name: hive-metastore
+    ports:
+      - "9083:9083"
+    depends_on:
+      - metastore-db
+    networks:
+      - bdproject_default   # или твоя сеть, важно чтобы была общая с spark/minio/airflow
+
   metastore-db:
     image: postgres:15
+    container_name: metastore-db
     environment:
       POSTGRES_DB: metastore
       POSTGRES_USER: hive
       POSTGRES_PASSWORD: hive
     volumes:
       - metastore_db:/var/lib/postgresql/data
-
-  hive-metastore:
-    build: ./hive-metastore
-    depends_on:
-      - metastore-db
-    ports:
-      - "9083:9083"
-    environment:
-      DB_HOST: metastore-db
-      DB_NAME: metastore
-      DB_USER: hive
-      DB_PASS: hive
-      S3_ENDPOINT: http://minio-server:9000
-      S3_ACCESS_KEY: miniominio
-      S3_SECRET_KEY: miniominio
+    networks:
+      - bdproject_default
 
 volumes:
   metastore_db:
+
+networks:
+  bdproject_default:
+    external: true
