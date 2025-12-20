@@ -1,0 +1,14 @@
+# Dockerfile.airflow
+FROM apache/airflow:3.1.0
+
+# 1. Ставим JDK (нужен для Spark)
+USER root
+RUN apt-get update && \
+    apt-get install -y default-jdk && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 2. Ставим провайдер Spark и pyspark в образ
+USER airflow
+RUN pip install --no-cache-dir \
+    apache-airflow-providers-apache-spark \
+    pyspark
