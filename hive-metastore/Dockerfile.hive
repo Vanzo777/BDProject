@@ -1,12 +1,23 @@
 FROM apache/hive:4.0.0
 
-# JDBC driver (вариант; можно закрепить версию)
-ADD https://jdbc.postgresql.org/download/postgresql-42.7.4.jar /opt/hive/lib/
+USER root
 
+# Устанавливаем curl если его нет
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Скачиваем PostgreSQL JDBC драйвер напрямую в lib
+RUN curl -L https://jdbc.postgresql.org/download/postgresql-42.7.4.jar \
+    -o /opt/hive/lib/postgresql-jdbc.jar && \
+    chmod 644 /opt/hive/lib/postgresql-jdbc.jar
+
+# Копируем конфигурацию
 COPY conf/hive-site.xml /opt/hive/conf/hive-site.xml
 COPY conf/core-site.xml /opt/hive/conf/core-site.xml
 
-ENTRYPOINT ["bash","-lc", "\
+# Возвращаемся к пользователю hive
+USER hive
+
+ENTRYPOINT ["bash", "-lc", "\
 /opt/hive/bin/schematool -dbType postgres -initSchema || true; \
 /opt/hive/bin/hive --service metastore -p 9083 \
 "]
