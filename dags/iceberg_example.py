@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 
@@ -13,13 +14,16 @@ with DAG(
     default_args=default_args,
     schedule=None,
     catchup=False,
-    tags=["iceberg", "minio"],
+    tags=["iceberg", "minio", "spark"],
 ) as dag:
 
     create_iceberg_table = BashOperator(
         task_id="create_iceberg_table",
         bash_command=r"""
+set -e
+
 spark-submit \
+  --packages org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0 \
   --master spark://spark-master:7077 \
   --deploy-mode client \
   --conf spark.driver.host=bdproject-airflow-worker-1 \
