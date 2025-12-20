@@ -8,7 +8,6 @@ spark = SparkSession.builder \
 
 print("=== SILVER LAYER: Normalizing and cleaning data ===")
 
-# Создаем namespace silver
 spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.silver")
 
 # ========== PRODUCTS SILVER ==========
@@ -16,20 +15,24 @@ print("Transforming bronze.products → silver.products...")
 
 df_products_bronze = spark.table("iceberg.bronze.products")
 
-# Нормализация:
-# 1. Конвертируем timestamp в правильный формат
-# 2. Создаем boolean поля из string
-# 3. Фильтруем невалидные данные
-# 4. Добавляем бизнес-логику
-
 df_products_silver = df_products_bronze \
-    .withColumn("expiration_date", to_date(col("product_info_expiration_date"), "yyyyMMdd")) \
-    .withColumn("product_timestamp", to_timestamp(col("product_info_timestamp"))) \
-    .withColumn("is_option", when(col("product_info_financial_product") == "Option", True).otherwise(False)) \
-    .withColumn("is_call", when(col("product_info_put_or_call") == "Call", True).otherwise(False)) \
-    .withColumn("is_put", when(col("product_info_put_or_call") == "Put", True).otherwise(False)) \
-    .withColumn("total_volume", col("all_volume") + col("ctag_volume") + col("etag_volume") + col("ptag_volume")) \
-    .withColumn("has_activity", when(col("total_volume") > 0, True).otherwise(False)) \
+    .withColumn("expiration_date", 
+                when(col("product_info_expiration_date").isNotNull(),
+                     to_date(col("product_info_expiration_date"), "yyyyMMdd"))
+                .otherwise(None)) \
+    .withColumn("product_timestamp", 
+                when(col("product_info_timestamp").isNotNull(),
+                     to_timestamp(col("product_info_timestamp")))
+                .otherwise(None)) \
+    .withColumn("is_option", when(col("product_info_financial_product") == "Option", lit(True)).otherwise(lit(False))) \
+    .withColumn("is_call", when(col("product_info_put_or_call") == "Call", lit(True)).otherwise(lit(False))) \
+    .withColumn("is_put", when(col("product_info_put_or_call") == "Put", lit(True)).otherwise(lit(False))) \
+    .withColumn("total_volume", 
+                coalesce(col("all_volume"), lit(0)) + 
+                coalesce(col("ctag_volume"), lit(0)) + 
+                coalesce(col("etag_volume"), lit(0)) + 
+                coalesce(col("ptag_volume"), lit(0))) \
+    .withColumn("has_activity", when(col("total_volume") > 0, lit(True)).otherwise(lit(False))) \
     .filter(col("product_info_order_book_id").isNotNull()) \
     .select(
         col("product_info_order_book_id").alias("order_book_id"),
@@ -55,7 +58,6 @@ df_products_silver = df_products_bronze \
         current_timestamp().alias("processed_timestamp")
     )
 
-# Создаем silver таблицу products
 spark.sql("""
     CREATE TABLE IF NOT EXISTS iceberg.silver.products (
         order_book_id BIGINT,
@@ -81,7 +83,7 @@ spark.sql("""
         processed_timestamp TIMESTAMP
     )
     USING iceberg
-    PARTITIONED BY (product_family, months(expiration_date))
+    PARTITIONED BY (product_family)
 """)
 
 df_products_silver.writeTo("iceberg.silver.products").overwrite()
@@ -93,25 +95,27 @@ print("Transforming bronze.orders → silver.orders...")
 
 df_orders_bronze = spark.table("iceberg.bronze.orders")
 
-# Нормализация orders:
-# 1. Конвертируем timestamp в правильный формат
-# 2. Создаем boolean из string
-# 3. Добавляем вычисляемые поля
-# 4. Фильтруем битые данные
-
 df_orders_silver = df_orders_bronze \
-    .withColumn("created_timestamp", to_timestamp(col("created_on"))) \
-    .withColumn("order_timestamp", to_timestamp(col("timestamp"))) \
-    .withColumn("is_deleted", when(col("deleted") == "true", True).otherwise(False)) \
-    .withColumn("is_fully_executed", when(col("fully_executed") == "true", True).otherwise(False)) \
-    .withColumn("is_partially_executed", when(col("partially_executed") == "true", True).otherwise(False)) \
-    .withColumn("is_buy", when(col("side") == "Buy", True).otherwise(False)) \
-    .withColumn("is_sell", when(col("side") == "Sell", True).otherwise(False)) \
+    .withColumn("created_timestamp", 
+                when(col("created_on").isNotNull(), to_timestamp(col("created_on")))
+                .otherwise(None)) \
+    .withColumn("order_timestamp", 
+                when(col("timestamp").isNotNull(), to_timestamp(col("timestamp")))
+                .otherwise(None)) \
+    .withColumn("is_deleted", when(col("deleted") == "true", lit(True)).otherwise(lit(False))) \
+    .withColumn("is_fully_executed", when(col("fully_executed") == "true", lit(True)).otherwise(lit(False))) \
+    .withColumn("is_partially_executed", when(col("partially_executed") == "true", lit(True)).otherwise(lit(False))) \
+    .withColumn("is_buy", when(col("side") == "Buy", lit(True)).otherwise(lit(False))) \
+    .withColumn("is_sell", when(col("side") == "Sell", lit(True)).otherwise(lit(False))) \
     .withColumn("executed_qty", col("created_with_qty") - col("qty_on_end")) \
-    .withColumn("fill_rate", (col("created_with_qty") - col("qty_on_end")) / col("created_with_qty")) \
+    .withColumn("fill_rate", 
+                when(col("created_with_qty") > 0,
+                     (col("created_with_qty") - col("qty_on_end")) / col("created_with_qty"))
+                .otherwise(lit(0.0))) \
     .withColumn("existed_for_seconds", col("existed_for") / 1e9) \
     .withColumn("reaction_time_seconds", col("min_reaction_time") / 1e9) \
     .filter(col("order_id").isNotNull()) \
+    .filter(col("order_timestamp").isNotNull()) \
     .select(
         col("order_id"),
         col("order_book_id"),

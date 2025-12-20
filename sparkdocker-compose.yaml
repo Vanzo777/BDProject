@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.spark
-    image: custom-spark:4.0.1-py312  # Даем имя образу
+    image: custom-spark:4.0.1-py312
     container_name: spark-master
     ports:
       - "5080:8080"
@@ -25,6 +25,7 @@ services:
     volumes:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
+      - ./data:/opt/airflow/data
     networks:
       - bdproject_default
 
@@ -32,7 +33,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.spark
-    image: custom-spark:4.0.1-py312  # Используем тот же образ
+    image: custom-spark:4.0.1-py312
     container_name: spark-worker
     depends_on:
       - master
@@ -54,6 +55,7 @@ services:
     volumes:
       - ./spark-data:/opt/spark/data
       - ./apps:/opt/spark/work-dir
+      - ./data:/opt/airflow/data
     networks:
       - bdproject_default
 
