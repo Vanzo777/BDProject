@@ -1,11 +1,7 @@
 from pyspark.sql import SparkSession
 
-# Создайте Spark Session с Iceberg
-spark = SparkSession.builder \
-    .appName("Iceberg Example") \
-    .getOrCreate()
+spark = SparkSession.builder.appName("Iceberg Example").getOrCreate()
 
-# Создайте тестовую таблицу
 spark.sql("""
     CREATE TABLE IF NOT EXISTS iceberg.sales (
         id BIGINT,
@@ -17,7 +13,6 @@ spark.sql("""
     PARTITIONED BY (date)
 """)
 
-# Вставьте данные
 spark.sql("""
     INSERT INTO iceberg.sales VALUES
     (1, 'Laptop', 1200.0, DATE'2024-01-15'),
@@ -25,11 +20,21 @@ spark.sql("""
     (3, 'Keyboard', 75.0, DATE'2024-01-16')
 """)
 
-# Прочитайте данные
-df = spark.table("iceberg.sales")
-df.show()
+print("Current data:")
+spark.table("iceberg.sales").show()
 
-# Time Travel - данные на определенную версию
-spark.sql("SELECT * FROM iceberg.sales VERSION AS OF 1").show()
+print("Snapshots:")
+snapshots_df = spark.sql("""
+    SELECT snapshot_id, committed_at, operation
+    FROM iceberg.sales.snapshots
+    ORDER BY committed_at
+""")
+snapshots_df.show(truncate=False)
+
+# берем самый ранний snapshot_id (можно взять и последний)
+first_snapshot_id = snapshots_df.first()["snapshot_id"]
+
+print(f"Time travel to snapshot_id={first_snapshot_id}:")
+spark.sql(f"SELECT * FROM iceberg.sales VERSION AS OF {first_snapshot_id}").show()
 
 spark.stop()

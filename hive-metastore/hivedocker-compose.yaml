@@ -1,0 +1,27 @@
+services:
+  metastore-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+    volumes:
+      - metastore_db:/var/lib/postgresql/data
+
+  hive-metastore:
+    build: ./hive-metastore
+    depends_on:
+      - metastore-db
+    ports:
+      - "9083:9083"
+    environment:
+      DB_HOST: metastore-db
+      DB_NAME: metastore
+      DB_USER: hive
+      DB_PASS: hive
+      S3_ENDPOINT: http://minio-server:9000
+      S3_ACCESS_KEY: miniominio
+      S3_SECRET_KEY: miniominio
+
+volumes:
+  metastore_db:

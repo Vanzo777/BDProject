@@ -1,0 +1,12 @@
+FROM apache/hive:4.0.0
+
+# JDBC driver (вариант; можно закрепить версию)
+ADD https://jdbc.postgresql.org/download/postgresql-42.7.4.jar /opt/hive/lib/
+
+COPY conf/hive-site.xml /opt/hive/conf/hive-site.xml
+COPY conf/core-site.xml /opt/hive/conf/core-site.xml
+
+ENTRYPOINT ["bash","-lc", "\
+/opt/hive/bin/schematool -dbType postgres -initSchema || true; \
+/opt/hive/bin/hive --service metastore -p 9083 \
+"]

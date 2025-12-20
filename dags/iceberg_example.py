@@ -32,13 +32,21 @@ spark-submit \
   --conf spark.sql.catalog.iceberg.type=hadoop \
   --conf spark.sql.catalog.iceberg.warehouse=s3a://warehouse/iceberg/ \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.endpoint=http://minio-server:9000 \
-  --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.access.key=minioadmin \
-  --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.secret.key=minioadmin \
+  --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.access.key=miniominio \
+  --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.secret.key=miniominio \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.path.style.access=true \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.connection.ssl.enabled=false \
   --conf spark.sql.catalog.iceberg.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
+  --conf spark.hadoop.fs.s3a.endpoint=http://minio-server:9000 \
+  --conf spark.hadoop.fs.s3a.access.key=miniominio \
+  --conf spark.hadoop.fs.s3a.secret.key=miniominio \
+  --conf spark.hadoop.fs.s3a.path.style.access=true \
+  --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+  --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
+  --conf spark.hadoop.fs.s3a.endpoint.region=us-east-1 \
   /opt/airflow/dags/scripts/create_iceberg_table.py
 """
-)
 
+)
+    
     create_iceberg_table
