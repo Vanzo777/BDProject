@@ -1,14 +1,12 @@
-version: '3.8'
-
 x-airflow-common: &airflow-common
   image: my-airflow-spark:latest
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__FERNET_KEY: '  '
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
@@ -25,13 +23,13 @@ x-airflow-common: &airflow-common
   depends_on: &airflow-common-depends-on
     redis:
       condition: service_healthy
-    postgres:
+    airflow-postgres:
       condition: service_healthy
   networks:
     - bdproject_default
 
 services:
-  postgres:
+  airflow-postgres:
     image: postgres:13
     environment:
       POSTGRES_USER: airflow
@@ -176,7 +174,7 @@ services:
 
         echo "Creating Spark connection spark_default..."
         /entrypoint airflow connections add spark_default \
-          --conn-type=Spark \
+          --conn-type=spark_connect \
           --conn-host=spark-master \
           --conn-port=7077
 
