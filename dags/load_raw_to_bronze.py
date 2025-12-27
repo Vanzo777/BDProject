@@ -27,6 +27,15 @@ with DAG(
     catchup=False,
     tags=['medallion', 'bronze', 'ingestion'],
 ) as dag:
+    
+    create_bronze_schema = SQLExecuteQueryOperator(
+        task_id='create_bronze_schema',
+        conn_id=TRINO_CONN_ID,
+        sql=f"""
+            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}
+            WITH (location = 's3a://lakehouse/bronze/')
+        """,
+    )
 
     # Создание таблицы raw_orders
     create_raw_orders_table = SQLExecuteQueryOperator(
@@ -171,5 +180,6 @@ with DAG(
     )
 
     # Зависимости
+    create_bronze_schema >> [create_raw_orders_table, create_raw_product_info_table]
     create_raw_orders_table >> insert_test_orders
     create_raw_product_info_table >> insert_test_products
