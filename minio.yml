@@ -1,28 +1,54 @@
-version: '3.2'
+version: '3.8'
 
 services:
-  minio:
+  minio-server:
     image: minio/minio:latest
     container_name: minio-server
     environment:
       MINIO_ROOT_USER: miniominio
       MINIO_ROOT_PASSWORD: miniominio
-    volumes:
-      - minio_data:/data
     ports:
-      - "9001:9001"
       - "9000:9000"
-    command: minio server /data --console-address ":9001"
-    networks:
-      - bdproject_default
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bdproject_default
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      minio-server:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...';
+      sleep 5;
+      mc alias set myminio http://minio-server:9000 miniominio miniominio;
+      echo 'Creating main lakehouse bucket...';
+      mc mb myminio/lakehouse --ignore-existing;
+      echo 'Creating directory structure...';
+      echo 'dummy' | mc pipe myminio/lakehouse/bronze/.keep;
+      echo 'dummy' | mc pipe myminio/lakehouse/silver/.keep;
+      echo 'dummy' | mc pipe myminio/lakehouse/gold/.keep;
+      echo 'dummy' | mc pipe myminio/lakehouse/warehouse/.keep;
+      echo 'Setting permissions...';
+      mc anonymous set public myminio/lakehouse;
+      echo 'MinIO setup completed!';
+      mc ls myminio/lakehouse;
+      "
+    networks:
+      - bdproject_default
 
 volumes:
-  minio_data:
+  minio-data:
     driver: local
 
 networks:

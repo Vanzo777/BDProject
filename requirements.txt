@@ -47,4 +47,6 @@ flake8==7.0.0
 isort==5.13.2
 
 minio==7.2.5
-apache-airflow-providers-trino
+apache-airflow-providers-trino>=5.6.1,<6.0.0
+
+pyspark

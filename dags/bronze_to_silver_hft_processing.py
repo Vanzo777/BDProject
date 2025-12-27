@@ -5,15 +5,18 @@ Medallion Architecture: Bronze → Silver трансформация
 
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.providers.trino.operators.trino import TrinoOperator
-from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+
 
 # Параметры подключения к Trino
 TRINO_CONN_ID = 'trino_default'
 CATALOG = 'iceberg'
 BRONZE_SCHEMA = 'bronze'
 SILVER_SCHEMA = 'silver'
+
+# Флаг для пересоздания таблиц (установите True для DROP и пересоздания)
+RECREATE_TABLES = True
+
 
 # Аргументы по умолчанию для DAG
 default_args = {
@@ -22,34 +25,54 @@ default_args = {
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 2,
-    'retry_delay': timedelta(minutes=5),
+    'retry_delay': timedelta(minutes=2),
 }
+
 
 # Определение DAG
 with DAG(
     dag_id='bronze_to_silver_hft_processing',
     default_args=default_args,
     description='ETL pipeline для обработки HFT trading данных из Bronze в Silver слой',
-    schedule_interval='@daily',  # Запускается ежедневно
-    start_date=days_ago(1),
+    schedule='@daily',
+    start_date=datetime(2025, 12, 26),
     catchup=False,
     tags=['medallion', 'bronze-to-silver', 'hft', 'trino'],
 ) as dag:
 
-    # Task 1: Создание Silver схемы если не существует
-    create_silver_schema = TrinoOperator(
-        task_id='create_silver_schema',
-        trino_conn_id=TRINO_CONN_ID,
+    # Task 0: Создание Bronze схемы
+    create_bronze_schema = SQLExecuteQueryOperator(
+        task_id='create_bronze_schema',
+        conn_id=TRINO_CONN_ID,
         sql=f"""
-            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}
-            WITH (location = 's3a://lakehouse-silver/')
+            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}
+            WITH (location = 's3a://lakehouse/bronze')
         """,
     )
 
-    # Task 2: Создание таблицы orders в Silver слое
-    create_silver_orders_table = TrinoOperator(
+    # Task 1: Создание Silver схемы
+    create_silver_schema = SQLExecuteQueryOperator(
+        task_id='create_silver_schema',
+        conn_id=TRINO_CONN_ID,
+        sql=f"""
+            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}
+            WITH (location = 's3a://lakehouse/silver')
+        """,
+    )
+
+    # Task 2a: Удаление таблицы orders если нужно пересоздать
+    drop_silver_orders_table = SQLExecuteQueryOperator(
+        task_id='drop_silver_orders_table',
+        conn_id=TRINO_CONN_ID,
+        sql=f"""
+            DROP TABLE IF EXISTS {CATALOG}.{SILVER_SCHEMA}.orders
+        """ if RECREATE_TABLES else "SELECT 1",
+    )
+
+    # Task 2b: Создание таблицы orders в Silver слое
+    create_silver_orders_table = SQLExecuteQueryOperator(
         task_id='create_silver_orders_table',
-        trino_conn_id=TRINO_CONN_ID,
+        conn_id=TRINO_CONN_ID,
         sql=f"""
             CREATE TABLE IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}.orders (
                 -- Идентификаторы
@@ -111,7 +134,7 @@ with DAG(
                 time_passed_since_last_event_min DOUBLE,
                 
                 -- Вычисляемые метрики
-                execution_ratio DOUBLE,  -- Доля исполненного ордера
+                execution_ratio DOUBLE,
                 
                 -- Метаданные обработки
                 processed_at TIMESTAMP(6),
@@ -125,10 +148,19 @@ with DAG(
         """,
     )
 
-    # Task 3: Создание таблицы product_info в Silver слое
-    create_silver_products_table = TrinoOperator(
+    # Task 3a: Удаление таблицы product_info если нужно пересоздать
+    drop_silver_products_table = SQLExecuteQueryOperator(
+        task_id='drop_silver_products_table',
+        conn_id=TRINO_CONN_ID,
+        sql=f"""
+            DROP TABLE IF EXISTS {CATALOG}.{SILVER_SCHEMA}.product_info
+        """ if RECREATE_TABLES else "SELECT 1",
+    )
+
+    # Task 3b: Создание таблицы product_info в Silver слое
+    create_silver_products_table = SQLExecuteQueryOperator(
         task_id='create_silver_products_table',
-        trino_conn_id=TRINO_CONN_ID,
+        conn_id=TRINO_CONN_ID,
         sql=f"""
             CREATE TABLE IF NOT EXISTS {CATALOG}.{SILVER_SCHEMA}.product_info (
                 -- Идентификаторы продукта
@@ -193,9 +225,9 @@ with DAG(
     )
 
     # Task 4: Загрузка и трансформация данных orders из Bronze в Silver
-    transform_orders_to_silver = TrinoOperator(
+    transform_orders_to_silver = SQLExecuteQueryOperator(
         task_id='transform_orders_to_silver',
-        trino_conn_id=TRINO_CONN_ID,
+        conn_id=TRINO_CONN_ID,
         sql=f"""
             INSERT INTO {CATALOG}.{SILVER_SCHEMA}.orders
             SELECT DISTINCT
@@ -300,14 +332,13 @@ with DAG(
                 AND timestamp IS NOT NULL
                 AND initial_qty IS NOT NULL
                 AND CAST(initial_qty AS DOUBLE) >= 0
-                -- Дедупликация выполняется через DISTINCT
         """,
     )
 
     # Task 5: Загрузка и трансформация данных product_info из Bronze в Silver
-    transform_products_to_silver = TrinoOperator(
+    transform_products_to_silver = SQLExecuteQueryOperator(
         task_id='transform_products_to_silver',
-        trino_conn_id=TRINO_CONN_ID,
+        conn_id=TRINO_CONN_ID,
         sql=f"""
             INSERT INTO {CATALOG}.{SILVER_SCHEMA}.product_info
             SELECT DISTINCT
@@ -385,9 +416,9 @@ with DAG(
     )
 
     # Task 6: Создание view для аналитики
-    create_analytics_view = TrinoOperator(
+    create_analytics_view = SQLExecuteQueryOperator(
         task_id='create_analytics_view',
-        trino_conn_id=TRINO_CONN_ID,
+        conn_id=TRINO_CONN_ID,
         sql=f"""
             CREATE OR REPLACE VIEW {CATALOG}.{SILVER_SCHEMA}.orders_with_product_info AS
             SELECT 
@@ -404,7 +435,8 @@ with DAG(
     )
 
     # Определение зависимостей задач
-    create_silver_schema >> [create_silver_orders_table, create_silver_products_table]
-    create_silver_orders_table >> transform_orders_to_silver
-    create_silver_products_table >> transform_products_to_silver
+    create_bronze_schema >> create_silver_schema
+    create_silver_schema >> [drop_silver_orders_table, drop_silver_products_table]
+    drop_silver_orders_table >> create_silver_orders_table >> transform_orders_to_silver
+    drop_silver_products_table >> create_silver_products_table >> transform_products_to_silver
     [transform_orders_to_silver, transform_products_to_silver] >> create_analytics_view

@@ -110,15 +110,12 @@ services:
   airflow-worker:
     <<: *airflow-common
     command: celery worker
-    # Явно задаем имя хоста для корректной работы spark-driver внутри контейнера
     hostname: airflow-worker
-    # Открываем порты для Spark Driver (обратное соединение от Executor) и логов
     expose:
       - 8793
       - 20000-20010
     ports:
       - "8793:8793"
-      # Пробрасываем порты драйвера (необязательно, если вся сеть внутри Docker, но полезно для дебага)
       - "20000-20010:20000-20010"
     healthcheck:
       test:
@@ -131,7 +128,6 @@ services:
     environment:
       <<: *airflow-common-env
       DUMB_INIT_SETSID: "0"
-      # Важно для Spark: чтобы драйвер слушал 0.0.0.0, а не localhost
       SPARK_LOCAL_IP: "0.0.0.0"
     restart: always
     depends_on:
@@ -162,30 +158,54 @@ services:
     command:
       - -c
       - |
-        echo "Running Airflow DB migrations..."
+        echo "==================================================================="
+        echo "Starting Airflow initialization..."
+        echo "==================================================================="
+        
+        echo "[1/4] Running Airflow DB migrations..."
         /entrypoint airflow db upgrade
-
-        echo "Creating Admin user..."
+        
+        echo "[2/4] Creating Admin user..."
         /entrypoint airflow users create \
           --username "${_AIRFLOW_WWW_USER_USERNAME:-airflow}" \
           --password "${_AIRFLOW_WWW_USER_PASSWORD:-airflow}" \
           --firstname Admin --lastname User \
-          --role Admin --email admin@example.com
-
-        echo "Creating Spark connection spark_default..."
+          --role Admin --email admin@example.com || echo "Admin user already exists"
+        
+        echo "[3/4] Creating Spark connection (spark_default)..."
+        /entrypoint airflow connections delete spark_default 2>/dev/null || true
         /entrypoint airflow connections add spark_default \
-          --conn-type=spark_connect \
-          --conn-host=spark-master \
-          --conn-port=7077
-
-        echo "Airflow init completed."
+          --conn-type spark_connect \
+          --conn-host spark-master \
+          --conn-port 7077
+        
+        echo "[4/4] Creating Trino connection (trino_default)..."
+        /entrypoint airflow connections delete trino_default 2>/dev/null || true
+        /entrypoint airflow connections add trino_default \
+          --conn-type trino \
+          --conn-host trino-coordinator \
+          --conn-port 8080 \
+          --conn-schema iceberg \
+          --conn-login airflow
+        
+        echo "==================================================================="
+        echo "Airflow initialization completed successfully!"
+        echo "==================================================================="
+        echo ""
+        echo "Available connections:"
+        /entrypoint airflow connections list
+        echo ""
+        echo "Access Airflow UI at: http://localhost:8080"
+        echo "Username: airflow"
+        echo "Password: airflow"
+        echo "==================================================================="
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-      _PIP_ADDITIONAL_REQUIREMENTS: '_PIP_ADDITIONAL_REQUIREMENTS'
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
     networks:
       - bdproject_default

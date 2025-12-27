@@ -1,6 +1,5 @@
 version: '3.8'
 
-
 services:
   trino-coordinator:
     image: trinodb/trino:latest
@@ -11,9 +10,15 @@ services:
       - CATALOG_MANAGEMENT=dynamic
     volumes:
       - ./trino/etc:/etc/trino
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: always
     networks:
       - bdproject_default
-
 
 networks:
   bdproject_default:
