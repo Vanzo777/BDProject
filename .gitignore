@@ -16,6 +16,7 @@ __pycache__/
 # Файлы IDE и редакторов
 .idea/
 .vscode/
+!.vscode/settings.json
 *.iml
 *.idea/
 

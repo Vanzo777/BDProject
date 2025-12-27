@@ -10,8 +10,6 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      # Инициализация БД с mock данными
-      - ./ai-agent/mock_data/init.sql:/docker-entrypoint-initdb.d/init.sql
       # Персистентное хранилище (данные сохранятся после перезапуска)
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
