@@ -11,7 +11,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    _PIP_ADDITIONAL_REQUIREMENTS: 'apache-airflow-providers-trino'
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
@@ -185,7 +185,7 @@ services:
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-      _PIP_ADDITIONAL_REQUIREMENTS: ''
+      _PIP_ADDITIONAL_REQUIREMENTS: '_PIP_ADDITIONAL_REQUIREMENTS'
     user: "0:0"
     networks:
       - bdproject_default

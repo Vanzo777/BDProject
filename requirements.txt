@@ -47,3 +47,4 @@ flake8==7.0.0
 isort==5.13.2
 
 minio==7.2.5
+apache-airflow-providers-trino
