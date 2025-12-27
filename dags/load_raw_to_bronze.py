@@ -1,14 +1,25 @@
 """
-DAG для загрузки сырых HFT данных в Bronze слой
+DAG для загрузки сырых HFT данных из CSV файлов в Bronze слой
+Использует PythonOperator для загрузки CSV через Pandas
 """
 
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.operators.python import PythonOperator
+import pandas as pd
+from trino.dbapi import connect
+from trino.auth import BasicAuthentication
 
 TRINO_CONN_ID = 'trino_default'
 CATALOG = 'iceberg'
 BRONZE_SCHEMA = 'bronze'
+
+# MinIO/S3 настройки
+MINIO_ENDPOINT = 'minio:9000'
+MINIO_ACCESS_KEY = 'minioadmin'
+MINIO_SECRET_KEY = 'minioadmin'
+BUCKET = 'lakehouse'
 
 default_args = {
     'owner': 'data-engineering',
@@ -18,22 +29,98 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
+def load_csv_to_bronze(table_name: str, csv_filename: str, **context):
+    """Загружает CSV из MinIO в Iceberg Bronze таблицу через Pandas"""
+    import io
+    from minio import Minio
+    
+    # Подключение к MinIO
+    minio_client = Minio(
+        MINIO_ENDPOINT,
+        access_key=MINIO_ACCESS_KEY,
+        secret_key=MINIO_SECRET_KEY,
+        secure=False
+    )
+    
+    # Чтение CSV из MinIO
+    csv_object = minio_client.get_object(BUCKET, f'raw/{csv_filename}')
+    csv_data = csv_object.read()
+    csv_object.close()
+    
+    # Парсинг CSV с Pandas
+    df = pd.read_csv(io.BytesIO(csv_data))
+    
+    # Конвертация всех колонок в VARCHAR
+    df = df.astype(str)
+    
+    print(f"Loaded {len(df)} rows from {csv_filename}")
+    
+    # Подключение к Trino
+    conn = connect(
+        host='trino',
+        port=8080,
+        user='trino',
+        catalog=CATALOG,
+        schema=BRONZE_SCHEMA,
+    )
+    cursor = conn.cursor()
+    
+    # Batch insert (по 1000 строк)
+    batch_size = 1000
+    total_rows = len(df)
+    
+    for i in range(0, total_rows, batch_size):
+        batch = df.iloc[i:i+batch_size]
+        
+        # Формирование VALUES для INSERT
+        values_list = []
+        for _, row in batch.iterrows():
+            values = ', '.join([f"'{str(val).replace("'", "''")}'" for val in row])
+            values_list.append(f"({values})")
+        
+        values_str = ', '.join(values_list)
+        
+        insert_sql = f"""
+            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.{table_name}
+            VALUES {values_str}
+        """
+        
+        cursor.execute(insert_sql)
+        print(f"Inserted batch {i // batch_size + 1}: rows {i} to {min(i + batch_size, total_rows)}")
+    
+    cursor.close()
+    conn.close()
+    
+    print(f"Successfully loaded {total_rows} rows into {CATALOG}.{BRONZE_SCHEMA}.{table_name}")
+
 with DAG(
     dag_id='load_raw_to_bronze',
     default_args=default_args,
-    description='Загрузка сырых данных в Bronze слой',
+    description='Загрузка сырых данных из CSV в Bronze слой через Python',
     schedule='@daily',
     start_date=datetime(2025, 12, 26),
     catchup=False,
     tags=['medallion', 'bronze', 'ingestion'],
 ) as dag:
 
-    # Создание таблицы raw_orders
+    # Task 0: Создание Bronze схемы
+    create_bronze_schema = SQLExecuteQueryOperator(
+        task_id='create_bronze_schema',
+        conn_id=TRINO_CONN_ID,
+        sql=f"""
+            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}
+            WITH (location = 's3a://lakehouse/bronze')
+        """,
+    )
+
+    # Task 1: Создание таблицы raw_orders
     create_raw_orders_table = SQLExecuteQueryOperator(
         task_id='create_raw_orders_table',
         conn_id=TRINO_CONN_ID,
         sql=f"""
-            CREATE TABLE IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}.raw_orders (
+            DROP TABLE IF EXISTS {CATALOG}.{BRONZE_SCHEMA}.raw_orders;
+            
+            CREATE TABLE {CATALOG}.{BRONZE_SCHEMA}.raw_orders (
                 order_id VARCHAR,
                 order_book_id VARCHAR,
                 side VARCHAR,
@@ -74,39 +161,24 @@ with DAG(
         """,
     )
 
-    # Вставка тестовых данных в raw_orders
-    insert_test_orders = SQLExecuteQueryOperator(
-        task_id='insert_test_orders',
-        conn_id=TRINO_CONN_ID,
-        sql=f"""
-            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.raw_orders VALUES
-            ('1001', '5001', 'BUY', '2025-12-26 10:00:00.000000', '2025-12-26 10:00:00.000000',
-             '100', '100', '50', '0', 'false', 'false', 'true',
-             '5000000000', '1000000', '2',
-             '5.0', '10.0', '2.0',
-             '0.5', '1.0', '0.1',
-             '100', '200', '50',
-             '1', '3', '0',
-             '2', '5', '1',
-             '500000000', '1000000000', '100000000'),
-            ('1002', '5002', 'SELL', '2025-12-26 10:01:00.000000', '2025-12-26 10:01:00.000000',
-             '200', '200', '100', '0', 'false', 'true', 'false',
-             '3000000000', '2000000', '1',
-             '3.0', '8.0', '1.0',
-             '0.3', '0.8', '0.05',
-             '150', '250', '75',
-             '2', '4', '1',
-             '3', '6', '2',
-             '400000000', '800000000', '200000000')
-        """,
+    # Task 2: Загрузка orders через Python
+    load_orders = PythonOperator(
+        task_id='load_orders_from_csv',
+        python_callable=load_csv_to_bronze,
+        op_kwargs={
+            'table_name': 'raw_orders',
+            'csv_filename': 'order_classification.csv'
+        },
     )
 
-    # Создание таблицы raw_product_info
+    # Task 3: Создание таблицы raw_product_info
     create_raw_product_info_table = SQLExecuteQueryOperator(
         task_id='create_raw_product_info_table',
         conn_id=TRINO_CONN_ID,
         sql=f"""
-            CREATE TABLE IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}.raw_product_info (
+            DROP TABLE IF EXISTS {CATALOG}.{BRONZE_SCHEMA}.raw_product_info;
+            
+            CREATE TABLE {CATALOG}.{BRONZE_SCHEMA}.raw_product_info (
                 product_info_order_book_id VARCHAR,
                 product_info_underlying_order_book_id VARCHAR,
                 product_family VARCHAR,
@@ -147,29 +219,17 @@ with DAG(
         """,
     )
 
-    # Вставка тестовых данных в raw_product_info
-    insert_test_products = SQLExecuteQueryOperator(
-        task_id='insert_test_products',
-        conn_id=TRINO_CONN_ID,
-        sql=f"""
-            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.raw_product_info VALUES
-            ('5001', '4001', 'OPTIONS', 'SPY_CALL_450', 'SPY Call Option Strike 450', 'OPTION', 'CALL',
-             '450.0', '2', '2', '20251231', '2025-12-26 10:00:00.000000', '1',
-             '100', '50', '5',
-             '1000.0', '2000.0', '1500.0', '500.0', '100.0',
-             '0.0', '100.0', '0.01', '2025-12-26 10:00:00.000000',
-             '100.0', '200.0', '0.05', '2025-12-26 10:00:00.000000',
-             '200.0', '500.0', '0.10', '2025-12-26 10:00:00.000000'),
-            ('5002', '4002', 'OPTIONS', 'SPY_PUT_440', 'SPY Put Option Strike 440', 'OPTION', 'PUT',
-             '440.0', '2', '2', '20251231', '2025-12-26 10:01:00.000000', '1',
-             '150', '75', '8',
-             '1500.0', '2500.0', '2000.0', '800.0', '150.0',
-             '0.0', '100.0', '0.01', '2025-12-26 10:01:00.000000',
-             '100.0', '200.0', '0.05', '2025-12-26 10:01:00.000000',
-             '200.0', '500.0', '0.10', '2025-12-26 10:01:00.000000')
-        """,
+    # Task 4: Загрузка products через Python
+    load_products = PythonOperator(
+        task_id='load_products_from_csv',
+        python_callable=load_csv_to_bronze,
+        op_kwargs={
+            'table_name': 'raw_product_info',
+            'csv_filename': 'product_info.csv'
+        },
     )
 
     # Зависимости
-    create_raw_orders_table >> insert_test_orders
-    create_raw_product_info_table >> insert_test_products
+    create_bronze_schema >> [create_raw_orders_table, create_raw_product_info_table]
+    create_raw_orders_table >> load_orders
+    create_raw_product_info_table >> load_products

@@ -54,3 +54,4 @@ minio==7.2.5
 apache-airflow-providers-trino>=5.6.1,<6.0.0
 
 pyspark
+apache-airflow-providers-postgres>=5.0.0
