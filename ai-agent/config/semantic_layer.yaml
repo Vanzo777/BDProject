@@ -1,31 +1,469 @@
 # Semantic Layer для SQL AI Agent
-# ВРЕМЕННАЯ ВЕРСИЯ - БД пустая, ожидается загрузка данных
+# Trading Analytics Database - Анализ торговых данных
 
 database:
-  name: "Analytics Database"
-  description: "База данных для аналитики"
+  name: "Trading Analytics Database"
+  description: "Аналитические витрины для анализа торговой активности по финансовым инструментам"
   dialect: "postgresql"
+  domain: "Trading & Financial Markets"
 
-# Пока таблиц нет - оставляем пустым
-tables: {}
+# Описание таблиц
+tables:
+  product_execution_metrics:
+    description: "Метрики исполнения заказов по торговым инструментам. Содержит агрегированную статистику производительности торговли по каждому продукту."
+    business_context: "Используется для анализа эффективности исполнения ордеров, выявления проблемных инструментов, оптимизации торговых стратегий."
+    columns:
+      created_at:
+        type: "timestamp"
+        description: "Дата и время создания записи (момент расчёта метрик)"
+        nullable: true
+        business_meaning: "Временная метка снапшота данных"
+      
+      etag_volume:
+        type: "double precision"
+        description: "Объём торговли в единицах измерения инструмента"
+        nullable: true
+        business_meaning: "Суммарный торговый объём по продукту"
+      
+      unique_id_count:
+        type: "bigint"
+        description: "Количество уникальных идентификаторов (вероятно уникальных трейдеров/сессий)"
+        nullable: true
+        business_meaning: "Уникальная активность участников"
+      
+      taker_count:
+        type: "bigint"
+        description: "Количество taker-ордеров (агрессивные ордера, которые забирают ликвидность)"
+        nullable: true
+        business_meaning: "Количество ордеров, исполненных немедленно по рыночной цене"
+      
+      total_orders:
+        type: "bigint"
+        description: "Общее количество всех ордеров по продукту"
+        nullable: true
+        business_meaning: "Суммарная торговая активность"
+      
+      avg_execution_ratio:
+        type: "double precision"
+        description: "Средний коэффициент исполнения ордеров (от 0 до 1, где 1 = 100% исполнение)"
+        nullable: true
+        business_meaning: "Насколько полно в среднем исполняются ордера"
+        typical_range: "0.0 - 1.0"
+      
+      execution_rate:
+        type: "double precision"
+        description: "Доля исполненных ордеров от общего числа (процент успешных исполнений)"
+        nullable: true
+        business_meaning: "Процент ордеров, которые были хотя бы частично исполнены"
+        typical_range: "0.0 - 1.0"
+      
+      deletion_rate:
+        type: "double precision"
+        description: "Доля удалённых/отменённых ордеров (процент неисполненных ордеров)"
+        nullable: true
+        business_meaning: "Процент ордеров, отменённых без исполнения"
+        typical_range: "0.0 - 1.0"
+      
+      avg_reaction_time_ms:
+        type: "double precision"
+        description: "Среднее время реакции системы на ордер в миллисекундах"
+        nullable: true
+        business_meaning: "Латентность обработки ордера"
+        unit: "миллисекунды"
+      
+      avg_lifetime_sec:
+        type: "double precision"
+        description: "Среднее время жизни ордера в секундах (от создания до исполнения/отмены)"
+        nullable: true
+        business_meaning: "Как долго в среднем ордер находится в книге заявок"
+        unit: "секунды"
+      
+      product_info_symbol:
+        type: "varchar"
+        description: "Тикер/символ торгового инструмента (например BTC, ETH, AAPL)"
+        nullable: true
+        business_meaning: "Идентификатор продукта на бирже"
+      
+      product_family:
+        type: "varchar"
+        description: "Семейство продуктов (например Crypto, Stocks, Options)"
+        nullable: true
+        business_meaning: "Категория финансового инструмента"
+        possible_values: "Зависит от данных (Crypto, Equities, Derivatives, etc.)"
+      
+      product_info_financial_product:
+        type: "varchar"
+        description: "Тип финансового продукта (Spot, Futures, Options, Perpetual)"
+        nullable: true
+        business_meaning: "Детальная классификация инструмента"
+        possible_values: "Spot, Futures, Options, Perpetual, Forward"
+    
+    data_characteristics:
+      update_frequency: "Периодическая (по расписанию расчёта метрик)"
+      time_range: "Зависит от загруженных данных"
+      typical_row_count: "Зависит от количества торгуемых инструментов"
+  
+  options_strike_expiry_stats:
+    description: "Статистика по опционам с группировкой по страйк-цене и дате экспирации. Специфична для опционных контрактов."
+    business_context: "Анализ опционной активности, паттернов исполнения PUT/CALL опционов, распределение ордеров по страйкам."
+    columns:
+      created_at:
+        type: "timestamp"
+        description: "Дата и время создания записи"
+        nullable: true
+      
+      product_info_expiration_date:
+        type: "date"
+        description: "Дата экспирации опционного контракта"
+        nullable: true
+        business_meaning: "Когда истекает опцион"
+      
+      zero_execution:
+        type: "boolean"
+        description: "Флаг: были ли ордера без исполнения (true = ордера не исполнились)"
+        nullable: true
+        business_meaning: "Индикатор нулевого исполнения"
+      
+      product_info_strike_price:
+        type: "double precision"
+        description: "Цена исполнения опциона (страйк)"
+        nullable: true
+        business_meaning: "По какой цене можно исполнить опцион"
+      
+      order_count:
+        type: "bigint"
+        description: "Общее количество ордеров"
+        nullable: true
+      
+      maker_order_count:
+        type: "bigint"
+        description: "Количество maker-ордеров (пассивные ордера, добавляющие ликвидность)"
+        nullable: true
+        business_meaning: "Ордера, размещённые в книге заявок и ожидающие исполнения"
+      
+      avg_execution_ratio:
+        type: "double precision"
+        description: "Средний коэффициент исполнения"
+        nullable: true
+        typical_range: "0.0 - 1.0"
+      
+      execution_rate:
+        type: "double precision"
+        description: "Доля исполненных ордеров"
+        nullable: true
+        typical_range: "0.0 - 1.0"
+      
+      etag_volume:
+        type: "double precision"
+        description: "Объём торговли"
+        nullable: true
+      
+      product_info_put_or_call:
+        type: "varchar"
+        description: "Тип опциона: PUT (право продать) или CALL (право купить)"
+        nullable: true
+        possible_values: ["PUT", "CALL"]
+        business_meaning: "Направление опционного контракта"
+      
+      product_family:
+        type: "varchar"
+        description: "Семейство продуктов"
+        nullable: true
+    
+    data_characteristics:
+      focus: "Опционные контракты"
+      grouping: "По strike price и expiration date"
+  
+  order_speed_execution_stats:
+    description: "Статистика исполнения ордеров по категориям скорости. Анализ производительности торговой системы."
+    business_context: "Мониторинг производительности торговой платформы, выявление узких мест, оптимизация скорости исполнения."
+    columns:
+      created_at:
+        type: "timestamp"
+        description: "Дата и время создания записи"
+        nullable: true
+      
+      order_count:
+        type: "bigint"
+        description: "Количество ордеров в данной категории скорости"
+        nullable: true
+      
+      avg_execution_ratio:
+        type: "double precision"
+        description: "Средний коэффициент исполнения"
+        nullable: true
+        typical_range: "0.0 - 1.0"
+      
+      execution_rate:
+        type: "double precision"
+        description: "Доля исполненных ордеров"
+        nullable: true
+        typical_range: "0.0 - 1.0"
+      
+      deletion_rate:
+        type: "double precision"
+        description: "Доля удалённых ордеров"
+        nullable: true
+        typical_range: "0.0 - 1.0"
+      
+      partially_executed_rate:
+        type: "double precision"
+        description: "Доля частично исполненных ордеров"
+        nullable: true
+        business_meaning: "Процент ордеров, исполненных не полностью"
+        typical_range: "0.0 - 1.0"
+      
+      avg_lifetime_sec:
+        type: "double precision"
+        description: "Среднее время жизни ордера в секундах"
+        nullable: true
+        unit: "секунды"
+      
+      median_lifetime_sec:
+        type: "double precision"
+        description: "Медианное время жизни ордера в секундах"
+        nullable: true
+        business_meaning: "Более устойчивая к выбросам метрика времени жизни"
+        unit: "секунды"
+      
+      avg_reaction_time_ms:
+        type: "double precision"
+        description: "Среднее время реакции системы в миллисекундах"
+        nullable: true
+        unit: "миллисекунды"
+      
+      avg_modify_count:
+        type: "double precision"
+        description: "Среднее количество модификаций ордера до исполнения/отмены"
+        nullable: true
+        business_meaning: "Сколько раз в среднем трейдеры изменяют ордер"
+      
+      speed_category:
+        type: "varchar"
+        description: "Категория скорости исполнения ордера"
+        nullable: true
+        possible_values: ["fast", "medium", "slow", "very_fast", "very_slow"]
+        business_meaning: "Классификация ордеров по скорости исполнения"
+    
+    data_characteristics:
+      grouping: "По категориям скорости"
+      focus: "Анализ производительности"
+  
+  volume_activity_analysis:
+    description: "Агрегированный анализ объёмов торговли и активности по семействам продуктов. High-level обзор торговой активности."
+    business_context: "Мониторинг общей торговой активности, выявление наиболее/наименее активных продуктов, анализ ликвидности."
+    columns:
+      created_at:
+        type: "timestamp"
+        description: "Дата и время создания записи"
+        nullable: true
+      
+      products_with_execution:
+        type: "bigint"
+        description: "Количество продуктов, по которым были исполнения"
+        nullable: true
+        business_meaning: "Сколько инструментов торговались успешно"
+      
+      zero_execution_rate:
+        type: "double precision"
+        description: "Доля продуктов без исполнений"
+        nullable: true
+        business_meaning: "Процент неликвидных инструментов"
+        typical_range: "0.0 - 1.0"
+      
+      total_volume:
+        type: "double precision"
+        description: "Общий объём торговли по всем продуктам"
+        nullable: true
+      
+      total_maker_orders:
+        type: "bigint"
+        description: "Общее количество maker-ордеров"
+        nullable: true
+      
+      avg_volume_per_product:
+        type: "double precision"
+        description: "Средний объём торговли на один продукт"
+        nullable: true
+        business_meaning: "Средняя ликвидность инструмента"
+      
+      avg_maker_orders_per_product:
+        type: "double precision"
+        description: "Среднее количество maker-ордеров на продукт"
+        nullable: true
+      
+      product_count:
+        type: "bigint"
+        description: "Общее количество продуктов в анализе"
+        nullable: true
+      
+      volume_per_order_ratio:
+        type: "double precision"
+        description: "Отношение объёма к количеству ордеров"
+        nullable: true
+        business_meaning: "Средний размер ордера"
+      
+      products_with_zero_execution:
+        type: "bigint"
+        description: "Количество продуктов без исполнений"
+        nullable: true
+        business_meaning: "Неликвидные инструменты"
+      
+      product_family:
+        type: "varchar"
+        description: "Семейство продуктов"
+        nullable: true
+      
+      product_info_financial_product:
+        type: "varchar"
+        description: "Тип финансового продукта"
+        nullable: true
+    
+    data_characteristics:
+      aggregation_level: "High-level агрегация по семействам продуктов"
+      focus: "Общий обзор рынка"
 
-relationships: []
+# Связи между таблицами
+relationships:
+  - description: "product_execution_metrics и options_strike_expiry_stats связаны через product_family (опционы - подмножество общих продуктов)"
+  - description: "volume_activity_analysis агрегирует данные из product_execution_metrics на уровне семейств"
+  - description: "order_speed_execution_stats дополняет product_execution_metrics детализацией по скорости"
+  - description: "Все таблицы имеют временную привязку через created_at для анализа динамики"
 
+# Бизнес-правила и особенности данных
 business_rules:
-  - rule: "БД находится в процессе наполнения данными"
-  - rule: "После загрузки данных необходимо обновить этот файл"
+  - rule: "Все rate метрики (execution_rate, deletion_rate, etc.) представлены как дробные числа от 0.0 до 1.0 (0% - 100%)"
+  - rule: "NULL значения допустимы во всех колонках - означают отсутствие данных для расчёта метрики"
+  - rule: "Время реакции (reaction_time) измеряется в миллисекундах, время жизни (lifetime) - в секундах"
+  - rule: "maker_order_count <= order_count (maker ордера - подмножество всех ордеров)"
+  - rule: "execution_rate + deletion_rate не обязательно равно 1.0 (могут быть другие статусы, например expired)"
+  - rule: "zero_execution = true означает что ни один ордер не был исполнен"
+  - rule: "taker_count показывает агрессивные ордера (забирают ликвидность), maker - пассивные (предоставляют ликвидность)"
+  - rule: "PUT опционы дают право продать, CALL - право купить базовый актив"
+  - rule: "speed_category классифицирует ордера: fast (< 1 сек), medium (1-10 сек), slow (> 10 сек) - точные пороги зависят от реализации"
 
-# Пока примеров нет
-examples: []
+# Примеры запросов для few-shot learning
+examples:
+  # Простые запросы
+  - question: "Сколько всего ордеров было обработано?"
+    sql: "SELECT SUM(total_orders) AS total_orders FROM product_execution_metrics"
+    explanation: "Суммируем все ордера по всем продуктам"
+  
+  - question: "Какой средний execution rate по всем инструментам?"
+    sql: "SELECT AVG(execution_rate) AS avg_execution_rate FROM product_execution_metrics WHERE execution_rate IS NOT NULL"
+    explanation: "Усредняем долю исполненных ордеров, игнорируя NULL"
+  
+  - question: "Список всех торгуемых инструментов"
+    sql: "SELECT DISTINCT product_info_symbol FROM product_execution_metrics WHERE product_info_symbol IS NOT NULL ORDER BY product_info_symbol"
+    explanation: "Получаем уникальные символы с сортировкой"
+  
+  # Фильтрация и сортировка
+  - question: "Топ-5 инструментов по объёму торговли"
+    sql: "SELECT product_info_symbol, product_family, etag_volume FROM product_execution_metrics WHERE etag_volume IS NOT NULL ORDER BY etag_volume DESC LIMIT 5"
+    explanation: "Сортируем по объёму в убывающем порядке и берём первые 5"
+  
+  - question: "Инструменты с низким execution rate (меньше 50%)"
+    sql: "SELECT product_info_symbol, execution_rate, deletion_rate FROM product_execution_metrics WHERE execution_rate < 0.5 ORDER BY execution_rate"
+    explanation: "Фильтруем инструменты с плохим исполнением"
+  
+  - question: "Какие продукты имеют самое долгое время жизни ордера?"
+    sql: "SELECT product_info_symbol, avg_lifetime_sec FROM product_execution_metrics WHERE avg_lifetime_sec IS NOT NULL ORDER BY avg_lifetime_sec DESC LIMIT 10"
+    explanation: "Находим продукты, где ордера живут дольше всего"
+  
+  # Группировка и агрегация
+  - question: "Средние метрики по семействам продуктов"
+    sql: "SELECT product_family, AVG(execution_rate) AS avg_execution, AVG(deletion_rate) AS avg_deletion, SUM(total_orders) AS total_orders FROM product_execution_metrics WHERE product_family IS NOT NULL GROUP BY product_family ORDER BY total_orders DESC"
+    explanation: "Группируем по семействам и считаем агрегаты"
+  
+  - question: "Статистика по типам финансовых продуктов"
+    sql: "SELECT product_info_financial_product, COUNT(*) AS product_count, AVG(avg_execution_ratio) AS avg_execution, SUM(etag_volume) AS total_volume FROM product_execution_metrics WHERE product_info_financial_product IS NOT NULL GROUP BY product_info_financial_product ORDER BY total_volume DESC"
+    explanation: "Анализ производительности по типам продуктов"
+  
+  # Опционы
+  - question: "Сколько PUT и CALL опционов торгуется?"
+    sql: "SELECT product_info_put_or_call, COUNT(*) AS count FROM options_strike_expiry_stats WHERE product_info_put_or_call IS NOT NULL GROUP BY product_info_put_or_call"
+    explanation: "Группируем опционы по типу"
+  
+  - question: "Топ-10 страйков по количеству ордеров"
+    sql: "SELECT product_info_strike_price, product_info_expiration_date, order_count, execution_rate FROM options_strike_expiry_stats ORDER BY order_count DESC LIMIT 10"
+    explanation: "Находим самые популярные страйки"
+  
+  - question: "Опционы с нулевым исполнением"
+    sql: "SELECT product_info_strike_price, product_info_expiration_date, product_info_put_or_call, order_count FROM options_strike_expiry_stats WHERE zero_execution = true ORDER BY order_count DESC"
+    explanation: "Фильтруем опционы, где не было исполнений"
+  
+  # Скорость исполнения
+  - question: "Распределение ордеров по категориям скорости"
+    sql: "SELECT speed_category, order_count, AVG(avg_execution_ratio) AS avg_execution FROM order_speed_execution_stats GROUP BY speed_category ORDER BY order_count DESC"
+    explanation: "Анализ производительности по скоростным категориям"
+  
+  - question: "Какая категория скорости имеет лучший execution rate?"
+    sql: "SELECT speed_category, execution_rate, deletion_rate, avg_lifetime_sec FROM order_speed_execution_stats ORDER BY execution_rate DESC"
+    explanation: "Сравниваем категории по успешности исполнения"
+  
+  # Анализ активности
+  - question: "Общий объём торговли по семействам продуктов"
+    sql: "SELECT product_family, total_volume, product_count, avg_volume_per_product FROM volume_activity_analysis ORDER BY total_volume DESC"
+    explanation: "Обзор торговой активности по категориям"
+  
+  - question: "Семейства с высокой долей неликвидных продуктов"
+    sql: "SELECT product_family, zero_execution_rate, products_with_zero_execution, product_count FROM volume_activity_analysis WHERE zero_execution_rate > 0.3 ORDER BY zero_execution_rate DESC"
+    explanation: "Находим категории с проблемами ликвидности (> 30% неликвидных)"
+  
+  # Сложные запросы
+  - question: "Инструменты с высоким объёмом но низким исполнением"
+    sql: "SELECT product_info_symbol, etag_volume, execution_rate, deletion_rate FROM product_execution_metrics WHERE etag_volume > (SELECT AVG(etag_volume) FROM product_execution_metrics) AND execution_rate < 0.5 ORDER BY etag_volume DESC"
+    explanation: "Находим аномалии: большой объём при плохом исполнении"
+  
+  - question: "Сравнение времени реакции по категориям скорости"
+    sql: "SELECT speed_category, avg_reaction_time_ms, median_lifetime_sec, avg_modify_count FROM order_speed_execution_stats ORDER BY avg_reaction_time_ms"
+    explanation: "Анализ латентности системы"
 
-# Общие синонимы (на будущее)
+# Синонимы и алиасы для естественного языка
 synonyms:
-  count: ["количество", "число", "сколько"]
-  total: ["общий", "всего", "суммарный"]
-  average: ["средний", "среднее", "в среднем"]
+  execution:
+    ru: ["исполнение", "выполнение", "экзекьюшн"]
+    en: ["execution", "fill", "filled"]
+  
+  order:
+    ru: ["ордер", "заявка", "заказ", "приказ"]
+    en: ["order", "request"]
+  
+  volume:
+    ru: ["объём", "объем", "оборот"]
+    en: ["volume", "turnover"]
+  
+  product:
+    ru: ["продукт", "инструмент", "актив", "тикер"]
+    en: ["product", "instrument", "asset", "ticker", "symbol"]
+  
+  rate:
+    ru: ["доля", "процент", "коэффициент", "рейт"]
+    en: ["rate", "ratio", "percentage"]
+  
+  maker:
+    ru: ["мейкер", "пассивный ордер", "лимитный"]
+    en: ["maker", "passive", "limit order"]
+  
+  taker:
+    ru: ["тейкер", "агрессивный ордер", "рыночный"]
+    en: ["taker", "aggressive", "market order"]
+  
+  strike:
+    ru: ["страйк", "цена исполнения"]
+    en: ["strike", "strike price", "exercise price"]
+  
+  expiration:
+    ru: ["экспирация", "истечение", "дата истечения"]
+    en: ["expiration", "expiry", "maturity"]
 
+# Метаданные
 metadata:
-  version: "0.0.1-empty"
+  version: "1.0.0"
   last_updated: "2025-12-27"
-  owner: "AI Agent Team"
-  notes: "Временная конфигурация. БД пустая. После загрузки данных обновить описания таблиц и примеры."
+  owner: "Trading Analytics Team"
+  domain: "Financial Markets Trading"
+  notes: |
+    Аналитические витрины для мониторинга торговой активности.
+    Данные обновляются периодически по расписанию.
+    Все метрики рассчитываются на основе исторических данных о торговле.

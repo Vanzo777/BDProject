@@ -1,9 +1,10 @@
 """
-DAG для загрузки сырых HFT данных в Bronze слой
+DAG для загрузки сырых HFT данных в Bronze слой через Polars
 """
 
 from datetime import datetime, timedelta
 from airflow import DAG
+from airflow.operators.bash import BashOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 TRINO_CONN_ID = 'trino_default'
@@ -21,23 +22,21 @@ default_args = {
 with DAG(
     dag_id='load_raw_to_bronze',
     default_args=default_args,
-    description='Загрузка сырых данных в Bronze слой',
+    description='Загрузка сырых CSV данных в Bronze слой через Polars',
     schedule='@daily',
     start_date=datetime(2025, 12, 26),
     catchup=False,
-    tags=['medallion', 'bronze', 'ingestion'],
+    tags=['medallion', 'bronze', 'ingestion', 'polars'],
 ) as dag:
     
-    create_bronze_schema = SQLExecuteQueryOperator(
-        task_id='create_bronze_schema',
-        conn_id=TRINO_CONN_ID,
-        sql=f"""
-            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}
-            WITH (location = 's3a://lakehouse/bronze/')
-        """,
+
+    # ===== ШАГ 1: Конвертация CSV -> Parquet через Polars =====
+    csv_to_parquet = BashOperator(
+        task_id='csv_to_parquet',
+        bash_command='python /opt/airflow/dags/scripts/csv_to_parquet_bronze.py',
     )
 
-    # Создание таблицы raw_orders
+    # ===== ШАГ 2: Создание таблицы raw_orders =====
     create_raw_orders_table = SQLExecuteQueryOperator(
         task_id='create_raw_orders_table',
         conn_id=TRINO_CONN_ID,
@@ -78,39 +77,23 @@ with DAG(
                 time_passed_since_last_event_min VARCHAR
             )
             WITH (
-                format = 'PARQUET'
+                format = 'PARQUET',
+                location = 's3a://lakehouse/bronze/order_classification/'
             )
         """,
     )
 
-    # Вставка тестовых данных в raw_orders
-    insert_test_orders = SQLExecuteQueryOperator(
-        task_id='insert_test_orders',
+    # ===== ШАГ 3: Загрузка данных из Parquet в Iceberg =====
+    load_orders_from_parquet = SQLExecuteQueryOperator(
+        task_id='load_orders_from_parquet',
         conn_id=TRINO_CONN_ID,
         sql=f"""
-            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.raw_orders VALUES
-            ('1001', '5001', 'BUY', '2025-12-26 10:00:00.000000', '2025-12-26 10:00:00.000000',
-             '100', '100', '50', '0', 'false', 'false', 'true',
-             '5000000000', '1000000', '2',
-             '5.0', '10.0', '2.0',
-             '0.5', '1.0', '0.1',
-             '100', '200', '50',
-             '1', '3', '0',
-             '2', '5', '1',
-             '500000000', '1000000000', '100000000'),
-            ('1002', '5002', 'SELL', '2025-12-26 10:01:00.000000', '2025-12-26 10:01:00.000000',
-             '200', '200', '100', '0', 'false', 'true', 'false',
-             '3000000000', '2000000', '1',
-             '3.0', '8.0', '1.0',
-             '0.3', '0.8', '0.05',
-             '150', '250', '75',
-             '2', '4', '1',
-             '3', '6', '2',
-             '400000000', '800000000', '200000000')
+            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.raw_orders
+            SELECT * FROM {CATALOG}.{BRONZE_SCHEMA}.raw_orders_external
         """,
     )
 
-    # Создание таблицы raw_product_info
+    # ===== ШАГ 4: Создание таблицы raw_product_info =====
     create_raw_product_info_table = SQLExecuteQueryOperator(
         task_id='create_raw_product_info_table',
         conn_id=TRINO_CONN_ID,
@@ -151,35 +134,24 @@ with DAG(
                 ticks_2_timestamp VARCHAR
             )
             WITH (
-                format = 'PARQUET'
+                format = 'PARQUET',
+                location = 's3a://lakehouse/bronze/product_info/'
             )
         """,
     )
 
-    # Вставка тестовых данных в raw_product_info
-    insert_test_products = SQLExecuteQueryOperator(
-        task_id='insert_test_products',
+    # ===== ШАГ 5: Загрузка product_info из Parquet в Iceberg =====
+    load_products_from_parquet = SQLExecuteQueryOperator(
+        task_id='load_products_from_parquet',
         conn_id=TRINO_CONN_ID,
         sql=f"""
-            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.raw_product_info VALUES
-            ('5001', '4001', 'OPTIONS', 'SPY_CALL_450', 'SPY Call Option Strike 450', 'OPTION', 'CALL',
-             '450.0', '2', '2', '20251231', '2025-12-26 10:00:00.000000', '1',
-             '100', '50', '5',
-             '1000.0', '2000.0', '1500.0', '500.0', '100.0',
-             '0.0', '100.0', '0.01', '2025-12-26 10:00:00.000000',
-             '100.0', '200.0', '0.05', '2025-12-26 10:00:00.000000',
-             '200.0', '500.0', '0.10', '2025-12-26 10:00:00.000000'),
-            ('5002', '4002', 'OPTIONS', 'SPY_PUT_440', 'SPY Put Option Strike 440', 'OPTION', 'PUT',
-             '440.0', '2', '2', '20251231', '2025-12-26 10:01:00.000000', '1',
-             '150', '75', '8',
-             '1500.0', '2500.0', '2000.0', '800.0', '150.0',
-             '0.0', '100.0', '0.01', '2025-12-26 10:01:00.000000',
-             '100.0', '200.0', '0.05', '2025-12-26 10:01:00.000000',
-             '200.0', '500.0', '0.10', '2025-12-26 10:01:00.000000')
+            INSERT INTO {CATALOG}.{BRONZE_SCHEMA}.raw_product_info
+            SELECT * FROM {CATALOG}.{BRONZE_SCHEMA}.raw_product_info_external
         """,
     )
 
-    # Зависимости
-    create_bronze_schema >> [create_raw_orders_table, create_raw_product_info_table]
-    create_raw_orders_table >> insert_test_orders
-    create_raw_product_info_table >> insert_test_products
+    # ===== ЗАВИСИМОСТИ =====
+    # Сначала конвертируем CSV -> Parquet
+    # Затем создаём таблицы и загружаем данные
+    csv_to_parquet >> create_raw_orders_table >> load_orders_from_parquet
+    csv_to_parquet >> create_raw_product_info_table >> load_products_from_parquet

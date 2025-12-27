@@ -9,7 +9,7 @@ RUN apt-get update && \
 
 # 2. Ставим провайдер Spark, Trino и pyspark в образ
 USER airflow
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir polars>=0.20.0 minio>=7.2.0 \
     apache-airflow-providers-apache-spark \
     apache-airflow-providers-trino \
     pyspark

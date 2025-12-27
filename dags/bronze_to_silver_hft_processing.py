@@ -7,16 +7,14 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
-
 # Параметры подключения к Trino
 TRINO_CONN_ID = 'trino_default'
 CATALOG = 'iceberg'
 BRONZE_SCHEMA = 'bronze'
 SILVER_SCHEMA = 'silver'
 
-# Флаг для пересоздания таблиц (установите True для DROP и пересоздания)
+# Флаг для пересоздания таблиц
 RECREATE_TABLES = True
-
 
 # Аргументы по умолчанию для DAG
 default_args = {
@@ -27,7 +25,6 @@ default_args = {
     'retries': 2,
     'retry_delay': timedelta(minutes=2),
 }
-
 
 # Определение DAG
 with DAG(
@@ -40,17 +37,7 @@ with DAG(
     tags=['medallion', 'bronze-to-silver', 'hft', 'trino'],
 ) as dag:
 
-    # Task 0: Создание Bronze схемы
-    create_bronze_schema = SQLExecuteQueryOperator(
-        task_id='create_bronze_schema',
-        conn_id=TRINO_CONN_ID,
-        sql=f"""
-            CREATE SCHEMA IF NOT EXISTS {CATALOG}.{BRONZE_SCHEMA}
-            WITH (location = 's3a://lakehouse/bronze')
-        """,
-    )
-
-    # Task 1: Создание Silver схемы
+    # Task 1: Создание Silver схемы (bronze уже создана в load_raw_to_bronze DAG)
     create_silver_schema = SQLExecuteQueryOperator(
         task_id='create_silver_schema',
         conn_id=TRINO_CONN_ID,
@@ -311,7 +298,7 @@ with DAG(
                 -- Метаданные обработки
                 CURRENT_TIMESTAMP as processed_at,
                 
-                -- Вычисление data_quality_score (процент заполненных критических полей)
+                -- Вычисление data_quality_score
                 (
                     CAST((order_id IS NOT NULL) AS INT) +
                     CAST((order_book_id IS NOT NULL) AS INT) +
@@ -325,7 +312,6 @@ with DAG(
                 
             FROM {CATALOG}.{BRONZE_SCHEMA}.raw_orders
             WHERE 
-                -- Фильтрация невалидных записей
                 order_id IS NOT NULL
                 AND order_book_id IS NOT NULL
                 AND side IS NOT NULL
@@ -358,7 +344,7 @@ with DAG(
                 CAST(product_info_number_of_decimal_in_price AS INT) as product_info_number_of_decimal_in_price,
                 CAST(product_info_number_of_decimals_in_strike_price AS INT) as product_info_number_of_decimals_in_strike_price,
                 
-                -- Даты (парсинг из YYYYMMDD формата)
+                -- Даты
                 CASE 
                     WHEN product_info_expiration_date IS NOT NULL 
                     THEN DATE_PARSE(CAST(product_info_expiration_date AS VARCHAR), '%Y%m%d')
@@ -379,7 +365,7 @@ with DAG(
                 CAST(leg_volume AS DOUBLE) as leg_volume,
                 CAST(occured_at_cross AS DOUBLE) as occured_at_cross,
                 
-                -- Tick sizes (первые 3 уровня)
+                -- Tick sizes
                 CAST(ticks_0_price_from AS DOUBLE) as ticks_0_price_from,
                 CAST(ticks_0_price_to AS DOUBLE) as ticks_0_price_to,
                 CAST(ticks_0_tick_size AS DOUBLE) as ticks_0_tick_size,
@@ -434,8 +420,7 @@ with DAG(
         """,
     )
 
-    # Определение зависимостей задач
-    create_bronze_schema >> create_silver_schema
+    # ✅ ИСПРАВЛЕННЫЕ ЗАВИСИМОСТИ - убрана create_bronze_schema
     create_silver_schema >> [drop_silver_orders_table, drop_silver_products_table]
     drop_silver_orders_table >> create_silver_orders_table >> transform_orders_to_silver
     drop_silver_products_table >> create_silver_products_table >> transform_products_to_silver

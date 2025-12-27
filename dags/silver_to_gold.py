@@ -91,38 +91,36 @@ with DAG(
                     APPROX_PERCENTILE(min_reaction_time_ms, 0.75) as p75
                 FROM {CATALOG}.{SILVER_SCHEMA}.orders
                 WHERE min_reaction_time_ms IS NOT NULL
+            ),
+            categorized_orders AS (
+                SELECT
+                    o.*,
+                    CASE 
+                        WHEN o.min_reaction_time_ms < (SELECT p25 FROM percentiles) THEN 'ultra_fast'
+                        WHEN o.min_reaction_time_ms < (SELECT p50 FROM percentiles) THEN 'fast'
+                        WHEN o.min_reaction_time_ms < (SELECT p75 FROM percentiles) THEN 'medium'
+                        ELSE 'slow'
+                    END as speed_category
+                FROM {CATALOG}.{SILVER_SCHEMA}.orders o
+                WHERE o.min_reaction_time_ms IS NOT NULL
             )
             SELECT
-                CASE 
-                    WHEN o.min_reaction_time_ms < p.p25 THEN 'ultra_fast'
-                    WHEN o.min_reaction_time_ms < p.p50 THEN 'fast'
-                    WHEN o.min_reaction_time_ms < p.p75 THEN 'medium'
-                    ELSE 'slow'
-                END as speed_category,
-                
+                speed_category,
                 COUNT(*) as order_count,
-                AVG(o.execution_ratio) as avg_execution_ratio,
+                AVG(execution_ratio) as avg_execution_ratio,
                 
-                CAST(SUM(CASE WHEN o.fully_executed THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as execution_rate,
-                CAST(SUM(CASE WHEN o.deleted THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as deletion_rate,
-                CAST(SUM(CASE WHEN o.partially_executed THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as partially_executed_rate,
+                CAST(SUM(CASE WHEN fully_executed THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as execution_rate,
+                CAST(SUM(CASE WHEN deleted THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as deletion_rate,
+                CAST(SUM(CASE WHEN partially_executed THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as partially_executed_rate,
                 
-                AVG(o.order_lifetime_seconds) as avg_lifetime_sec,
-                APPROX_PERCENTILE(o.order_lifetime_seconds, 0.5) as median_lifetime_sec,
-                AVG(o.min_reaction_time_ms) as avg_reaction_time_ms,
-                AVG(CAST(o.modify_count AS DOUBLE)) as avg_modify_count,
+                AVG(order_lifetime_seconds) as avg_lifetime_sec,
+                APPROX_PERCENTILE(order_lifetime_seconds, 0.5) as median_lifetime_sec,
+                AVG(min_reaction_time_ms) as avg_reaction_time_ms,
+                AVG(CAST(modify_count AS DOUBLE)) as avg_modify_count,
                 
                 CURRENT_TIMESTAMP as created_at
-            FROM {CATALOG}.{SILVER_SCHEMA}.orders o
-            CROSS JOIN percentiles p
-            WHERE o.min_reaction_time_ms IS NOT NULL
-            GROUP BY 
-                CASE 
-                    WHEN o.min_reaction_time_ms < p.p25 THEN 'ultra_fast'
-                    WHEN o.min_reaction_time_ms < p.p50 THEN 'fast'
-                    WHEN o.min_reaction_time_ms < p.p75 THEN 'medium'
-                    ELSE 'slow'
-                END
+            FROM categorized_orders
+            GROUP BY speed_category
         """,
     )
 
