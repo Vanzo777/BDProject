@@ -6,7 +6,7 @@ DAG для загрузки сырых HFT данных из CSV файлов в
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 import pandas as pd
 from trino.dbapi import connect
 from trino.auth import BasicAuthentication

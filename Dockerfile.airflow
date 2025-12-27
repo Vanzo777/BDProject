@@ -7,9 +7,7 @@ RUN apt-get update && \
     apt-get install -y default-jdk && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Ставим провайдер Spark, Trino и pyspark в образ
+# 2. Копируем requirements.txt и устанавливаем зависимости
 USER airflow
-RUN pip install --no-cache-dir \
-    apache-airflow-providers-apache-spark \
-    apache-airflow-providers-trino \
-    pyspark
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
