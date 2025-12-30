@@ -1,0 +1,31 @@
+services:
+  hive-metastore:
+    build:
+      context: .
+      dockerfile: Dockerfile.hive
+    container_name: hive-metastore
+    ports:
+      - "9083:9083"
+    depends_on:
+      - metastore-db
+    networks:
+      - bdproject_default
+
+  metastore-db:
+    image: postgres:15
+    container_name: metastore-db
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+    volumes:
+      - metastore_db:/var/lib/postgresql/data
+    networks:
+      - bdproject_default
+
+volumes:
+  metastore_db:
+
+networks:
+  bdproject_default:
+    external: true

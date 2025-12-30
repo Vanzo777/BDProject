@@ -1,44 +1,30 @@
-# version: '3.2'
-
-# services:
-#   # Это ваш сервис MinIO, он остается почти без изменений
-#   app:
-#     image: minio/minio
-#     container_name: minio-server
-#     env_file: ./minio.env-sample
-#     volumes:
-#      - ./minio-data:/data
-#     ports:
-#      - "9001:9001"
-#      - "9000:9000"
-#     networks:
-#       - traefik_public
-#     command:  minio server /data --console-address ":9001"
-#     # Метки traefik здесь больше не нужны, если вы ходите через localhost,
-#     # но можно и оставить, они не мешают.
-
-# networks:
-#   traefik_public:
-#     external: true
-
-
 version: '3.2'
 
 services:
-  app:
-    image: minio/minio
+  minio:
+    image: minio/minio:latest
     container_name: minio-server
-    env_file: ./minio.env-sample
+    environment:
+      MINIO_ROOT_USER: miniominio
+      MINIO_ROOT_PASSWORD: miniominio
     volumes:
-     - ./minio-data:/data
+      - minio_data:/data
     ports:
-     - "9001:9001"
-     - "9000:9000"
+      - "9001:9001"
+      - "9000:9000"
+    command: minio server /data --console-address ":9001"
     networks:
-      - airflow_net  # <-- Подключаемся к сети (используем алиас снизу)
-    command:  minio server /data --console-address ":9001"
+      - bdproject_default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  minio_data:
+    driver: local
 
 networks:
-  airflow_net:       # <-- Внутреннее имя сети в этом файле
+  bdproject_default:
     external: true
-    name: big_data_1st_praktise_default # <-- Реальное имя сети, где живут Postgres и Airflow

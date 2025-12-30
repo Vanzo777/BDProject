@@ -16,6 +16,7 @@ __pycache__/
 # Файлы IDE и редакторов
 .idea/
 .vscode/
+!.vscode/settings.json
 *.iml
 *.idea/
 
@@ -27,3 +28,7 @@ venv/
 /logs/
 /plugins/
 /pgdata/
+
+minio-data/
+# или, если хочешь строго из корня
+/minio-data/

@@ -1,0 +1,29 @@
+services:
+  # PostgreSQL для mock аналитических витрин
+  postgres:
+    image: postgres:16-alpine
+    container_name: mock_analytics_db
+    environment:
+      POSTGRES_DB: mock_analytics
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: "123"
+    ports:
+      - "5433:5432"
+    volumes:
+      # Персистентное хранилище (данные сохранятся после перезапуска)
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mock_analytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bdproject_default
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  bdproject_default:
+    external: true
